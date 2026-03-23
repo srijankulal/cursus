@@ -3,94 +3,87 @@
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { GraduationCap, Briefcase, Zap, Brain, TrendingUp } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { ArrowRight, Layers, Cpu, BarChart3 } from 'lucide-react';
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-white text-base-text flex flex-col items-center justify-center p-8 bg-[radial-gradient(ellipse_at_top_right,var(--color-accent-blue),white_70%)] relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-accent-blue/10 rounded-full blur-[100px] -z-10 animate-pulse pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-accent-green/5 rounded-full blur-[100px] -z-10 pointer-events-none" />
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* Nav */}
+      <header className="border-b border-app-border px-8 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 bg-black rounded-lg flex items-center justify-center">
+            <span className="text-white text-xs font-bold">C</span>
+          </div>
+          <span className="font-semibold text-app-text text-base tracking-tight">Cursus</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <Link href="/student">
+            <Button variant="ghost" size="sm" className="text-app-muted font-medium">Student</Button>
+          </Link>
+          <Link href="/hod">
+            <Button size="sm" className="bg-black text-white hover:bg-neutral-800 rounded-lg font-medium">HOD Dashboard</Button>
+          </Link>
+        </div>
+      </header>
 
-      <motion.div 
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: 'easeOut' }}
-        className="max-w-4xl w-full text-center space-y-16"
-      >
-        <div className="space-y-6">
-          <motion.div 
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="flex items-center justify-center space-x-3 mb-4"
-          >
-            <div className="w-14 h-14 bg-black text-white rounded-[1.5rem] flex items-center justify-center font-black text-2xl shadow-xl shadow-black/10 transform -rotate-12 transition-transform hover:rotate-0">C</div>
-            <span className="text-4xl font-black tracking-tighter">Cursus</span>
-            <div className="px-3 py-1 bg-accent-blue/40 text-accent-blue-dark text-[10px] font-black uppercase tracking-widest rounded-full border border-accent-blue-mid/20">Beta</div>
-          </motion.div>
-          
-          <h1 className="text-7xl font-black tracking-tighter leading-[0.95] text-balance">
-            Track your <span className="text-accent-blue-mid">Syllabus.</span><br />
-            Master with <span className="text-accent-green-mid">AI.</span>
+      {/* Hero */}
+      <main className="flex-1 flex flex-col items-center justify-center px-6 py-24 text-center max-w-3xl mx-auto w-full">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="space-y-8"
+        >
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-neutral-100 border border-app-border rounded-full text-xs font-medium text-app-muted">
+            <Cpu size={12} />
+            Powered by Gemini AI
+          </div>
+
+          <h1 className="text-5xl sm:text-6xl font-bold tracking-tight text-app-text leading-tight">
+            Stay ahead of<br />
+            <span className="text-neutral-400">your syllabus.</span>
           </h1>
-          <p className="text-xl text-base-muted font-bold max-w-2xl mx-auto leading-relaxed">
-            The next-generation BCA syllabus tracker and study planner powered by Claude Sonnet. Personalized, high-yield, and performance-driven.
+
+          <p className="text-app-muted text-lg font-normal leading-relaxed max-w-xl mx-auto">
+            Cursus tracks your BCA syllabus completion, flags what matters most,
+            and uses Gemini AI to build you a personalised study plan.
           </p>
-        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-12 px-4">
-          <Link href="/student" className="group">
-            <Card className="rounded-[3rem] border border-base-border shadow-md hover:shadow-2xl transition-all duration-500 hover:-translate-y-3 bg-white p-10 h-full flex flex-col items-center justify-center space-y-8 overflow-hidden relative group">
-              <div className="absolute inset-0 bg-accent-blue/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="w-20 h-20 bg-accent-blue/30 rounded-[2rem] flex items-center justify-center text-accent-blue-dark shadow-inner transform group-hover:scale-110 transition-transform">
-                <GraduationCap size={40} />
-              </div>
-              <div className="text-center relative">
-                <h3 className="text-2xl font-black tracking-tight mb-2">Student Portal</h3>
-                <p className="text-sm text-base-muted font-bold tracking-tight">Track syllabus, check risk levels & AI study plans.</p>
-              </div>
-              <Button className="h-14 px-12 bg-black text-white rounded-2xl font-black text-base group-hover:bg-accent-blue-mid transition-all shadow-xl shadow-black/10 active:scale-95">
-                Sign In
+          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+            <Link href="/student">
+              <Button className="h-11 px-8 bg-black text-white hover:bg-neutral-800 rounded-xl font-medium gap-2">
+                Student Portal <ArrowRight size={16} />
               </Button>
-            </Card>
-          </Link>
-
-          <Link href="/hod" className="group">
-            <Card className="rounded-[3rem] border border-base-border shadow-md hover:shadow-2xl transition-all duration-500 hover:-translate-y-3 bg-white p-10 h-full flex flex-col items-center justify-center space-y-8 overflow-hidden relative group">
-              <div className="absolute inset-0 bg-accent-green/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="w-20 h-20 bg-accent-green/30 rounded-[2rem] flex items-center justify-center text-accent-green-dark shadow-inner transform group-hover:scale-110 transition-transform">
-                <Briefcase size={40} />
-              </div>
-              <div className="text-center relative">
-                <h3 className="text-2xl font-black tracking-tight mb-2">HOD Dashboard</h3>
-                <p className="text-sm text-base-muted font-bold tracking-tight">Class-wide analytics, risk reports & performance charts.</p>
-              </div>
-              <Button variant="outline" className="h-14 px-12 bg-white text-base-text border-base-border rounded-2xl font-black text-base group-hover:border-accent-green-mid transition-all shadow-md active:scale-95">
-                Go to Dashboard
+            </Link>
+            <Link href="/hod">
+              <Button variant="outline" className="h-11 px-8 rounded-xl font-medium border-app-border text-app-text hover:bg-neutral-50">
+                HOD Dashboard
               </Button>
-            </Card>
-          </Link>
-        </div>
+            </Link>
+          </div>
+        </motion.div>
 
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1 }}
-          className="flex flex-wrap justify-center gap-10 pt-10"
+        {/* Feature row */}
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.5 }}
+          className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-20 w-full"
         >
           {[
-            { icon: Zap, label: 'Real-time Sync' },
-            { icon: Brain, label: 'Claude AI AI' },
-            { icon: TrendingUp, label: 'Risk Analysis' }
-          ].map((feature, i) => (
-            <div key={i} className="flex items-center space-x-3 text-base-muted">
-              <feature.icon size={20} className="text-black" />
-              <span className="text-xs font-black uppercase tracking-widest">{feature.label}</span>
-            </div>
+            { icon: Layers, title: 'Syllabus Tracker', desc: 'Mark topics done, see your progress per unit and subject.' },
+            { icon: Cpu, title: 'AI Study Plan', desc: 'Gemini generates a day-by-day schedule based on your pace.' },
+            { icon: BarChart3, title: 'Risk Analysis', desc: 'Know if you are on track or at risk — weeks before the exam.' },
+          ].map((f, i) => (
+            <Card key={i} className="text-left p-6 border border-app-border rounded-xl shadow-none bg-neutral-50 hover:bg-white hover:shadow-sm transition-all">
+              <f.icon size={20} className="text-app-muted mb-4" />
+              <h3 className="font-semibold text-sm text-app-text mb-1">{f.title}</h3>
+              <p className="text-xs text-app-muted leading-relaxed">{f.desc}</p>
+            </Card>
           ))}
         </motion.div>
-      </motion.div>
+      </main>
     </div>
   );
 }
