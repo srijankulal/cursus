@@ -1,12 +1,70 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ArrowRight, Layers, Cpu, BarChart3 } from 'lucide-react';
 
+import { ROLE_HOME_ROUTES, type SessionRole } from '@/lib/auth/session';
+
+const roleLabelMap: Record<SessionRole, string> = {
+  hod: 'HOD Dashboard',
+  staff: 'Staff Portal',
+  students: 'Student Portal',
+};
+
 export default function LandingPage() {
+  const [sessionRole, setSessionRole] = useState<SessionRole | null>(null);
+  const [sessionResolved, setSessionResolved] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadSession = async () => {
+      try {
+        const response = await fetch('/api/auth/session', { method: 'GET' });
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (mounted) {
+          setSessionRole((data.role as SessionRole | null) ?? null);
+        }
+      } catch {
+        if (mounted) {
+          setSessionRole(null);
+        }
+      } finally {
+        if (mounted) {
+          setSessionResolved(true);
+        }
+      }
+    };
+
+    loadSession();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const primaryRole = useMemo(() => sessionRole ?? 'students', [sessionRole]);
+
+  const portalLink = ROLE_HOME_ROUTES[primaryRole];
+  const portalLabel = roleLabelMap[primaryRole];
+
+  const showPublicCtas = sessionResolved && !sessionRole;
+
+  async function handleLogout() {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } finally {
+      setSessionRole(null);
+      window.location.reload();
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#fafafa] flex flex-col font-sans selection:bg-black selection:text-white">
       {/* Nav */}
@@ -17,15 +75,34 @@ export default function LandingPage() {
           </div>
           <span className="font-bold text-black text-lg tracking-tight">Cursus</span>
         </div>
-        <div className="flex items-center gap-4">
-          <Link href="/student" className="hidden sm:block">
-            <Button variant="ghost" size="sm" className="text-neutral-600 hover:text-black font-semibold tracking-tight transition-colors">Student</Button>
-          </Link>
-          <Link href="/hod">
-            <Button size="sm" className="bg-black text-white hover:bg-neutral-800 rounded-xl px-5 h-9 font-bold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-md shadow-black/5">
-              HOD Dashboard
-            </Button>
-          </Link>
+        <div className="flex items-center gap-3">
+          {!sessionResolved ? null : sessionRole ? (
+            <>
+              <Link href={portalLink}>
+                <Button size="sm" className="bg-black text-white hover:bg-neutral-800 rounded-lg font-medium">{portalLabel}</Button>
+              </Link>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-app-muted font-medium"
+                onClick={handleLogout}
+              >
+                Logout
+              </Button>
+            </>
+          ) : (
+            <>
+              <Link href="/auth">
+                <Button variant="ghost" size="sm" className="text-app-muted font-medium">Login / Sign up</Button>
+              </Link>
+              <Link href="/student">
+                <Button variant="ghost" size="sm" className="text-app-muted font-medium">Student</Button>
+              </Link>
+              <Link href="/hod">
+                <Button size="sm" className="bg-black text-white hover:bg-neutral-800 rounded-lg font-medium">HOD Dashboard</Button>
+              </Link>
+            </>
+          )}
         </div>
       </header>
 
@@ -56,17 +133,19 @@ export default function LandingPage() {
             and uses Gemini AI to build your personalized study path.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center pt-6 px-4">
-            <Link href="/student">
-              <Button className="h-14 px-10 bg-black text-white hover:bg-neutral-800 rounded-2xl font-bold gap-2 text-base transition-all hover:scale-[1.03] active:scale-[0.97] shadow-xl shadow-black/10">
-                Launch Portal <ArrowRight size={18} />
+          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+            <Link href={portalLink}>
+              <Button className="h-11 px-8 bg-black text-white hover:bg-neutral-800 rounded-xl font-medium gap-2">
+                {portalLabel} <ArrowRight size={16} />
               </Button>
             </Link>
-            <Link href="/staff">
-              <Button variant="outline" className="h-14 px-10 rounded-2xl font-bold border-neutral-200 text-black hover:bg-white hover:border-black/20 bg-white/50 backdrop-blur-sm shadow-sm transition-all text-base">
-                Staff Access
-              </Button>
-            </Link>
+            {showPublicCtas && (
+              <Link href="/hod">
+                <Button variant="outline" className="h-11 px-8 rounded-xl font-medium border-app-border text-app-text hover:bg-neutral-50">
+                  HOD Dashboard
+                </Button>
+              </Link>
+            )}
           </div>
         </motion.div>
 
