@@ -8,7 +8,7 @@ import {
   SESSION_COOKIE_NAME,
 } from './lib/auth/session';
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const expectedRole = getRoleForPathname(pathname);
   const cookieRoleValue = request.cookies.get(SESSION_COOKIE_NAME)?.value;
