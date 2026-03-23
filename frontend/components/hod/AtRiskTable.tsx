@@ -16,7 +16,7 @@ const atRiskStudents = [
 
 export const AtRiskTable = () => (
   <div className="rounded-3xl border border-slate-200 bg-white shadow-premium overflow-hidden flex flex-col min-h-[400px]">
-    <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+    <div className="px-4 sm:px-8 py-4 sm:py-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50">
       <div className="flex items-center gap-3">
         <div className="w-9 h-9 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center shadow-sm border border-orange-200/50">
            <AlertTriangle size={18} />
@@ -27,16 +27,16 @@ export const AtRiskTable = () => (
         </div>
       </div>
       
-      <div className="flex items-center gap-4">
-        <div className="relative group">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
+        <div className="relative group flex-1 sm:flex-initial">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-blue-500 transition-colors" />
           <input 
             type="text" 
             placeholder="Search USN..." 
-            className="h-9 w-44 pl-9 pr-4 bg-white border border-slate-200 rounded-xl text-xs font-bold uppercase tracking-widest focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all shadow-sm"
+            className="h-9 w-full sm:w-44 pl-9 pr-4 bg-white border border-slate-200 rounded-xl text-xs font-bold uppercase tracking-widest focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all shadow-sm"
           />
         </div>
-        <button className="text-[11px] font-bold text-blue-600 hover:text-blue-700 uppercase tracking-widest border border-blue-100 px-4 h-9 rounded-xl bg-blue-50/50 shadow-sm transition-all active:scale-95">Export PDF</button>
+        <button className="text-[11px] font-bold text-blue-600 hover:text-blue-700 uppercase tracking-widest border border-blue-100 px-4 h-9 rounded-xl bg-blue-50/50 shadow-sm transition-all active:scale-95 whitespace-nowrap">Export PDF</button>
       </div>
     </div>
 

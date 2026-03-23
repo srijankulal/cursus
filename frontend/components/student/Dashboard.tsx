@@ -81,34 +81,34 @@ export const Dashboard = () => {
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
         className={cn(
-          'p-8 rounded-3xl border bg-gradient-to-br shadow-premium relative overflow-hidden group',
+          'p-5 sm:p-8 rounded-2xl sm:rounded-3xl border bg-gradient-to-br shadow-premium relative overflow-hidden group',
           risk.bg, risk.border, risk.text
         )}
       >
         <div className="absolute right-0 top-0 w-64 h-64 bg-white/10 blur-[100px] -mr-32 -mt-32 pointer-events-none" />
         
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 relative z-10">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 sm:gap-8 relative z-10">
           <div className="space-y-4 max-w-xl">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <span className={cn("px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-white/20 backdrop-blur-md shadow-sm")}>
                 {risk.label}
               </span>
-              <div className="flex items-center gap-1.5 text-white/70 font-bold text-[11px]">
+              <div className="flex items-center gap-1.5 text-white/70 font-bold text-[10px] sm:text-[11px]">
                 <CalendarDays size={13} />
                 <span className="uppercase tracking-widest">EXAM IN {status.daysLeft} DAYS</span>
               </div>
             </div>
             <div>
-              <h2 className="text-6xl font-bold tracking-tighter leading-none">
-                {status.percentageComplete}% <span className="text-xl font-bold opacity-60 tracking-normal ml-1">Complete</span>
+              <h2 className="text-4xl sm:text-6xl font-bold tracking-tighter leading-none">
+                {status.percentageComplete}% <span className="text-lg sm:text-xl font-bold opacity-60 tracking-normal ml-1">Complete</span>
               </h2>
-              <p className="mt-4 text-base font-medium opacity-80 max-w-md">
+              <p className="mt-3 sm:mt-4 text-sm sm:text-base font-medium opacity-80 max-w-md">
                 {risk.sub}
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-x-8 gap-y-6 pt-6 lg:pt-0 lg:pl-10 border-t lg:border-t-0 lg:border-l border-white/20">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-2 gap-x-6 sm:gap-x-8 gap-y-4 sm:gap-y-6 pt-6 lg:pt-0 lg:pl-10 border-t lg:border-t-0 lg:border-l border-white/20">
             {[
               { label: 'Target / Day', v: status.requiredPace, icon: Target },
               { label: 'Current Pace', v: status.currentPace, icon: TrendingUp },
@@ -116,11 +116,11 @@ export const Dashboard = () => {
               { label: 'Days Left', v: status.daysLeft, icon: Clock },
             ].map((s, i) => (
               <div key={i} className="flex flex-col">
-                <div className="flex items-center gap-2 mb-1.5 opacity-70">
+                <div className="flex items-center gap-2 mb-1 sm:mb-1.5 opacity-70">
                   <s.icon size={13} className="shrink-0" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">{s.label}</span>
+                  <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">{s.label}</span>
                 </div>
-                <p className="text-2xl font-bold leading-none">{s.v}</p>
+                <p className="text-xl sm:text-2xl font-bold leading-none">{s.v}</p>
               </div>
             ))}
           </div>

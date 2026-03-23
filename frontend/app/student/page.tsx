@@ -21,6 +21,7 @@ export default function StudentPage() {
   const [tab, setTab] = useState('dashboard');
   const [progress, setProgress] = useState(0);
   const [collapsed, setCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const sem = syllabus[0];
 
   useEffect(() => {
@@ -42,14 +43,19 @@ export default function StudentPage() {
   };
 
   return (
-    <div className="flex h-screen bg-app-bg text-app-text overflow-hidden">
+    <div className="flex h-screen bg-app-bg text-app-text overflow-hidden relative">
       <Sidebar
         activeTab={tab}
-        setActiveTab={setTab}
+        setActiveTab={(t) => {
+          setTab(t);
+          setIsMobileMenuOpen(false);
+        }}
         semesterName={sem.name}
         progress={progress}
         collapsed={collapsed}
         setCollapsed={setCollapsed}
+        isMobileOpen={isMobileMenuOpen}
+        setIsMobileOpen={setIsMobileMenuOpen}
       />
 
       <main className="flex-1 overflow-y-auto flex flex-col bg-app-bg">
@@ -57,38 +63,48 @@ export default function StudentPage() {
         <div className="flex-1 flex flex-col m-3 sm:m-6 bg-app-surface rounded-[1.25rem] border border-app-border shadow-premium overflow-hidden">
           
           {/* Header Area */}
-          <header className="px-8 py-6 border-b border-app-border shrink-0 flex items-center justify-between">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={tab}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
-                transition={{ duration: 0.2 }}
-                className="flex items-center gap-5"
+          <header className="px-4 sm:px-8 py-4 sm:py-6 border-b border-app-border shrink-0 flex items-center justify-between">
+            <div className="flex items-center gap-3 sm:gap-5 min-w-0">
+              <button 
+                onClick={() => setIsMobileMenuOpen(true)}
+                className="lg:hidden p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
               >
-                <div className={cn('w-1.5 h-10 rounded-full', page.hue)} />
-                <div className="min-w-0">
-                  <h1 className="text-xl font-bold tracking-tight text-neutral-900">{page.title}</h1>
-                  <p className="text-[13px] text-app-muted mt-0.5 line-clamp-1">{page.sub}</p>
-                </div>
-              </motion.div>
-            </AnimatePresence>
+                <div className="w-5 h-0.5 bg-current mb-1" />
+                <div className="w-5 h-0.5 bg-current mb-1" />
+                <div className="w-5 h-0.5 bg-current" />
+              </button>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={tab}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex items-center gap-3 sm:gap-5 min-w-0"
+                >
+                  <div className={cn('w-1 h-8 sm:w-1.5 sm:h-10 rounded-full shrink-0', page.hue)} />
+                  <div className="min-w-0">
+                    <h1 className="text-lg sm:text-xl font-bold tracking-tight text-neutral-900 truncate">{page.title}</h1>
+                    <p className="hidden sm:block text-[13px] text-app-muted mt-0.5 line-clamp-1">{page.sub}</p>
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            </div>
             
             <div className="flex -space-x-2 shrink-0">
-               {[1, 2, 3].map(i => (
-                 <div key={i} className="w-8 h-8 rounded-full border-2 border-white bg-neutral-100 flex items-center justify-center text-[10px] font-bold text-neutral-400">
+               {[1, 2].map(i => (
+                 <div key={i} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-white bg-neutral-100 flex items-center justify-center text-[10px] font-bold text-neutral-400">
                    {i}
                  </div>
                ))}
-               <div className="w-8 h-8 rounded-full border-2 border-white bg-neutral-900 flex items-center justify-center text-[10px] font-bold text-white">
+               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-white bg-neutral-900 flex items-center justify-center text-[10px] font-bold text-white">
                  +
                </div>
             </div>
           </header>
 
           {/* Dynamic Content Panel */}
-          <div className="flex-1 overflow-y-auto px-8 py-10">
+          <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 sm:py-10">
             <div className="max-w-4xl mx-auto">
               <AnimatePresence mode="wait">
                 <motion.div

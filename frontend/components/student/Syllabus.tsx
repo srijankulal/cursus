@@ -41,32 +41,36 @@ export const Syllabus = ({ activeSemesterId }: { activeSemesterId: string }) => 
         return (
           <div 
             key={subject.id} 
-            className="border border-slate-200 rounded-[2rem] bg-white shadow-premium overflow-visible transition-all duration-300"
+            className="border border-slate-200 rounded-2xl sm:rounded-[2rem] bg-white shadow-premium overflow-visible transition-all duration-300"
           >
             {/* Subject Trigger */}
             <button 
               onClick={() => setOpenSubject(isOpen ? null : subject.id)}
-              className="w-full flex items-center gap-6 px-6 py-6 hover:bg-slate-50/50 transition-colors text-left rounded-[2rem] group"
+              className="w-full flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 px-4 sm:px-6 py-4 sm:py-6 hover:bg-slate-50/50 transition-colors text-left rounded-2xl sm:rounded-[2rem] group"
             >
-              <div className={cn('w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-lg border border-white/20 bg-gradient-to-br group-hover:scale-110 transition-transform duration-300', hue)}>
-                <BookOpen size={20} className="text-white" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition-colors tracking-tight leading-tight">{subject.name}</h3>
-                <div className="flex items-center gap-3 mt-1 opacity-60">
-                   <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">
-                     {subject.units.length} Units · {subTopics.length} topics
-                   </span>
+              <div className="flex items-center gap-4 sm:gap-6 w-full">
+                <div className={cn('w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 shadow-lg border border-white/20 bg-gradient-to-br group-hover:scale-110 transition-transform duration-300', hue)}>
+                  <BookOpen size={18} className="text-white sm:w-5 sm:h-5" />
                 </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 group-hover:text-blue-600 transition-colors tracking-tight leading-tight truncate">{subject.name}</h3>
+                  <div className="flex items-center gap-3 mt-1 opacity-60">
+                    <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">
+                      {subject.units.length} Units · {subTopics.length} topics
+                    </span>
+                  </div>
+                </div>
+                <ChevronDown size={18} className={cn('sm:hidden text-slate-300 transition-transform duration-300', isOpen ? 'rotate-180 text-slate-600' : '')} />
               </div>
-              <div className="flex items-center gap-4 shrink-0 px-4 py-2 bg-slate-50 border border-slate-200/50 rounded-2xl mr-2">
-                <div className="flex flex-col items-end">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Mastery</span>
+              
+              <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto mt-2 sm:mt-0 px-3 sm:px-4 py-2 bg-slate-50 border border-slate-200/50 rounded-xl sm:rounded-2xl shrink-0">
+                <div className="flex flex-col items-start sm:items-end">
+                  <span className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Mastery</span>
                   <span className={cn("text-xs font-bold", progress === 100 ? 'text-emerald-600' : 'text-blue-600')}>{progress}%</span>
                 </div>
-                <Progress value={progress} className="w-16 h-2 bg-slate-200" />
+                <Progress value={progress} className="w-24 sm:w-16 h-1.5 sm:h-2 bg-slate-200" />
+                <ChevronDown size={18} className={cn('hidden sm:block text-slate-300 transition-transform duration-300', isOpen ? 'rotate-180 text-slate-600' : '')} />
               </div>
-              <ChevronDown size={18} className={cn('text-slate-300 transition-transform duration-300 mr-2', isOpen ? 'rotate-180 text-slate-600' : '')} />
             </button>
 
             <AnimatePresence>

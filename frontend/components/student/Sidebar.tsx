@@ -12,6 +12,8 @@ interface SidebarProps {
   progress: number;
   collapsed: boolean;
   setCollapsed: (v: boolean) => void;
+  isMobileOpen?: boolean;
+  setIsMobileOpen?: (v: boolean) => void;
 }
 
 const tabs = [
@@ -22,51 +24,78 @@ const tabs = [
 ];
 
 export const Sidebar = ({
-  activeTab, setActiveTab, semesterName, progress, collapsed, setCollapsed,
+  activeTab, setActiveTab, semesterName, progress, collapsed, setCollapsed, isMobileOpen, setIsMobileOpen
 }: SidebarProps) => (
-  <motion.aside
-    animate={{ width: collapsed ? 72 : 248 }}
-    transition={{ type: 'spring', stiffness: 280, damping: 32 }}
-    className="relative shrink-0 flex flex-col h-screen bg-slate-50 border-r border-slate-200 overflow-visible z-20"
-    style={{ boxShadow: '12px 0 32px -16px rgba(0,0,0,0.08)' }}
-  >
-    {/* Sidebar Container */}
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Brand Header */}
-      <div className={cn(
-        'flex items-center h-[72px] border-b border-slate-200 shrink-0 px-4 transition-all',
-        collapsed ? 'justify-center' : 'gap-4'
-      )}>
-        {collapsed ? (
-          <button
-            onClick={() => setCollapsed(false)}
-            className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shadow-slate-900/10"
-            title="Expand Cursus"
-          >
-            <span className="text-white text-sm font-black leading-none uppercase">C</span>
-          </button>
-        ) : (
-          <>
-            <div className="w-10 h-10 bg-slate-950 rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-slate-900/10 transition-transform active:scale-95 cursor-pointer">
-              <span className="text-white text-sm font-black leading-none uppercase">C</span>
-            </div>
-            <motion.span
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="font-black text-sm text-slate-900 tracking-tighter flex-1 whitespace-nowrap overflow-hidden pr-2 uppercase"
-            >
-              Cursus <span className="text-[10px] font-bold text-slate-400 opacity-70 ml-1">v1.2</span>
-            </motion.span>
+  <>
+    {/* Mobile Overlay */}
+    <AnimatePresence>
+      {isMobileOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setIsMobileOpen?.(false)}
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 lg:hidden"
+        />
+      )}
+    </AnimatePresence>
+
+    <motion.aside
+      initial={false}
+      animate={{ 
+        width: collapsed ? 72 : 248,
+        x: isMobileOpen ? 0 : (typeof window !== 'undefined' && window.innerWidth < 1024 ? -248 : 0)
+      }}
+      transition={{ type: 'spring', stiffness: 280, damping: 32 }}
+      className={cn(
+        "fixed lg:relative flex flex-col h-screen bg-slate-50 border-r border-slate-200 overflow-visible z-50 transition-transform",
+        !isMobileOpen && "max-lg:-translate-x-full"
+      )}
+      style={{ boxShadow: '12px 0 32px -16px rgba(0,0,0,0.08)' }}
+    >
+      {/* Sidebar Container */}
+      <div className="flex flex-col h-full overflow-hidden">
+        {/* Brand Header */}
+        <div className={cn(
+          'flex items-center h-[72px] border-b border-slate-200 shrink-0 px-4 transition-all',
+          collapsed ? 'justify-center' : 'gap-4'
+        )}>
+          {collapsed ? (
             <button
-              onClick={() => setCollapsed(true)}
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-900 hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 transition-all active:scale-90"
-              title="Minimize Workspace"
+              onClick={() => setCollapsed(false)}
+              className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shadow-slate-900/10"
+              title="Expand Cursus"
             >
-              <PanelLeftClose size={17} />
+              <span className="text-white text-sm font-black leading-none uppercase">C</span>
             </button>
-          </>
-        )}
-      </div>
+          ) : (
+            <>
+              <div className="w-10 h-10 bg-slate-950 rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-slate-900/10 transition-transform active:scale-95 cursor-pointer">
+                <span className="text-white text-sm font-black leading-none uppercase">C</span>
+              </div>
+              <motion.span
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="font-black text-sm text-slate-900 tracking-tighter flex-1 whitespace-nowrap overflow-hidden pr-2 uppercase"
+              >
+                Cursus <span className="text-[10px] font-bold text-slate-400 opacity-70 ml-1">v1.2</span>
+              </motion.span>
+              <button
+                onClick={() => setCollapsed(true)}
+                className="hidden lg:flex w-9 h-9 rounded-xl items-center justify-center text-slate-400 hover:text-slate-900 hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 transition-all active:scale-90"
+                title="Minimize Workspace"
+              >
+                <PanelLeftClose size={17} />
+              </button>
+              <button
+                onClick={() => setIsMobileOpen?.(false)}
+                className="lg:hidden w-9 h-9 rounded-xl flex items-center justify-center text-slate-400"
+              >
+                <PanelLeftClose size={17} />
+              </button>
+            </>
+          )}
+        </div>
 
       {/* Nav Items */}
       <nav className={cn('flex-1 py-6 space-y-2 overflow-y-auto overflow-x-hidden transition-all', collapsed ? 'px-3' : 'px-4')}>
@@ -150,4 +179,5 @@ export const Sidebar = ({
       )}
     </div>
   </motion.aside>
+  </>
 );
