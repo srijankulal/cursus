@@ -1,96 +1,111 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { mockStudents, Student } from '@/data/mockStudents';
-import { MoreVertical, ChevronRight, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { 
-  Table, 
-  TableBody, 
-  TableCaption, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { User, AlertTriangle, TrendingDown, Clock, Search } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-export const AtRiskTable = () => {
-  const riskStyles = {
-    green: { bg: 'bg-accent-green/40', text: 'text-accent-green-dark', border: 'border-accent-green-mid/20' },
-    yellow: { bg: 'bg-accent-blue/40', text: 'text-accent-blue-dark', border: 'border-accent-blue-mid/20' },
-    red: { bg: 'bg-accent-red/40', text: 'text-accent-red-dark', border: 'border-accent-red-mid/20' },
-  };
+const atRiskStudents = [
+  { id: '1', name: 'Sheru K.', roll: 'BCA202301', progress: 42, risk: 'High', trend: 'down', missed: 3 },
+  { id: '2', name: 'Amish K.', roll: 'BCA202312', progress: 45, risk: 'Medium', trend: 'stable', missed: 2 },
+  { id: '3', name: 'Ziyan M.', roll: 'BCA202345', progress: 38, risk: 'High', trend: 'down', missed: 5 },
+  { id: '4', name: 'Sagar S.', roll: 'BCA202364', progress: 51, risk: 'Medium', trend: 'up', missed: 1 },
+];
 
-  return (
-    <Card className="rounded-[3rem] border-base-border shadow-xl bg-white overflow-hidden p-10 space-y-10">
-      <div className="flex justify-between items-center">
-        <div className="space-y-1">
-          <h3 className="text-3xl font-black tracking-tight flex items-center">
-            Student Performance Registry
-            <div className="ml-4 w-10 h-10 bg-base-surface rounded-2xl flex items-center justify-center text-base-muted border border-base-border">
-              <AlertCircle size={20} />
-            </div>
-          </h3>
-          <p className="text-sm font-bold text-base-muted">Real-time analysis of syllabus coverage and academic risk levels.</p>
+export const AtRiskTable = () => (
+  <div className="rounded-3xl border border-slate-200 bg-white shadow-premium overflow-hidden flex flex-col min-h-[400px]">
+    <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center shadow-sm border border-orange-200/50">
+           <AlertTriangle size={18} />
         </div>
-        <Button variant="outline" className="rounded-2xl font-black text-xs uppercase tracking-widest px-8 h-12 border-base-border hover:bg-base-surface transition-all">
-          <span>View Archive</span>
-          <ChevronRight size={18} className="ml-2" />
-        </Button>
+        <div>
+          <h3 className="text-base font-bold text-slate-900 leading-tight">Student Success Alerts</h3>
+          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Automated Risk Analysis</p>
+        </div>
       </div>
+      
+      <div className="flex items-center gap-4">
+        <div className="relative group">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-blue-500 transition-colors" />
+          <input 
+            type="text" 
+            placeholder="Search USN..." 
+            className="h-9 w-44 pl-9 pr-4 bg-white border border-slate-200 rounded-xl text-xs font-bold uppercase tracking-widest focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all shadow-sm"
+          />
+        </div>
+        <button className="text-[11px] font-bold text-blue-600 hover:text-blue-700 uppercase tracking-widest border border-blue-100 px-4 h-9 rounded-xl bg-blue-50/50 shadow-sm transition-all active:scale-95">Export PDF</button>
+      </div>
+    </div>
 
-      <div className="rounded-[2rem] border border-base-border overflow-hidden">
-        <Table className="bg-white">
-          <TableHeader className="bg-base-surface/50">
-            <TableRow className="border-b border-base-border group">
-              <TableHead className="py-6 px-10 text-[11px] font-black uppercase tracking-[0.15em] text-base-muted">Student</TableHead>
-              <TableHead className="py-6 text-center text-[11px] font-black uppercase tracking-[0.15em] text-base-muted">Coverage</TableHead>
-              <TableHead className="py-6 text-center text-[11px] font-black uppercase tracking-[0.15em] text-base-muted">Risk Status</TableHead>
-              <TableHead className="py-6 text-center text-[11px] font-black uppercase tracking-[0.15em] text-base-muted">Days Left</TableHead>
-              <TableHead className="py-6 text-[11px] font-black uppercase tracking-[0.15em] text-base-muted">Behind Subjects</TableHead>
-              <TableHead className="py-6 px-10"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody className="divide-y divide-base-border">
-            {mockStudents.map((student, i) => (
-              <TableRow key={student.id} className="group hover:bg-base-surface transition-colors data-[state=selected]:bg-transparent border-b border-base-border">
-                <TableCell className="py-8 px-10 font-black text-base text-base-text">{student.name}</TableCell>
-                <TableCell className="py-8 text-center min-w-[150px]">
-                   <div className="flex flex-col items-center space-y-2">
-                     <span className="font-extrabold text-sm">{student.completion}%</span>
-                     <Progress value={student.completion} className={`h-2 shadow-inner ${student.riskLevel === 'red' ? 'bg-accent-red/20' : student.riskLevel === 'yellow' ? 'bg-accent-blue/20' : 'bg-accent-green/20'}`} />
-                   </div>
-                </TableCell>
-                <TableCell className="py-8 text-center">
-                  <span className={`px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.1em] ${riskStyles[student.riskLevel].bg} ${riskStyles[student.riskLevel].text} border ${riskStyles[student.riskLevel].border} shadow-sm`}>
-                    {student.riskLevel}
-                  </span>
-                </TableCell>
-                <TableCell className="py-8 text-center font-black text-base-muted text-sm">{student.daysLeft}d</TableCell>
-                <TableCell className="py-8">
-                   <div className="flex flex-wrap gap-2 max-w-xs">
-                     {student.subjectsBehind.length > 0 ? student.subjectsBehind.map((s, j) => (
-                       <span key={j} className="px-3 py-1.5 rounded-xl border border-base-border bg-white text-[9px] font-bold text-base-muted uppercase tracking-tight">{s}</span>
-                     )) : (
-                       <div className="flex items-center space-x-2 text-accent-green-dark">
-                         <CheckCircle2 size={14} className="animate-pulse" />
-                         <span className="text-[10px] font-bold uppercase">Optimal Pace</span>
-                       </div>
-                     )}
-                   </div>
-                </TableCell>
-                <TableCell className="py-8 px-10 text-right">
-                  <Button variant="ghost" size="icon" className="rounded-xl hover:bg-white border-transparent hover:border-base-border group-hover:shadow-sm opacity-0 group-hover:opacity-100 transition-all">
-                    <MoreVertical size={20} className="text-base-muted" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    </Card>
-  );
-};
+    <div className="flex-1 overflow-x-auto">
+      <Table>
+        <TableHeader className="bg-slate-50/10">
+          <TableRow className="border-b border-slate-100 hover:bg-transparent">
+            <TableHead className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] px-8 h-12">Student Profile</TableHead>
+            <TableHead className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] px-8 h-12 text-center">Status</TableHead>
+            <TableHead className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] px-8 h-12">Content Coverage</TableHead>
+            <TableHead className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] px-8 h-12 text-right">Trend</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {atRiskStudents.map((s, i) => (
+            <motion.tr 
+              key={s.id} 
+              initial={{ opacity: 0, x: -8 }} 
+              animate={{ opacity: 1, x: 0 }} 
+              transition={{ delay: i * 0.05 }}
+              className="group hover:bg-slate-50/80 transition-all border-b border-slate-50 cursor-default"
+            >
+              <TableCell className="px-8 py-5">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 shadow-inner group-hover:scale-110 transition-transform">
+                    <User size={18} />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-slate-900 leading-tight">{s.name}</span>
+                    <span className="text-[11px] font-bold text-slate-400 tracking-tighter uppercase">{s.roll}</span>
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell className="px-8 py-5 text-center">
+                <Badge variant={s.risk === 'High' ? 'destructive' : 'default'} className={cn(
+                  'rounded-lg text-[10px] font-bold uppercase tracking-widest px-2.5 py-1.5 shadow-sm',
+                  s.risk === 'Medium' ? 'bg-orange-500 hover:bg-orange-600' : ''
+                )}>
+                  {s.risk} RISK
+                </Badge>
+                <div className="flex items-center justify-center gap-1.5 mt-2 opacity-50">
+                  <Clock size={11} className="text-slate-400" />
+                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">{s.missed} WEEKS DELAY</span>
+                </div>
+              </TableCell>
+              <TableCell className="px-8 py-5 min-w-[200px]">
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest leading-none">
+                    <span className="text-slate-400">Mastery Level</span>
+                    <span className="text-blue-600">{s.progress}%</span>
+                  </div>
+                  <Progress value={s.progress} className="h-1.5 bg-slate-100 rounded-full" />
+                </div>
+              </TableCell>
+              <TableCell className="px-8 py-5 text-right">
+                <div className="flex flex-col items-end gap-1">
+                  {s.trend === 'down' && <TrendingDown size={18} className="text-rose-600 bg-rose-50 p-1 rounded-md" />}
+                  {s.trend === 'up' && <TrendingDown size={18} className="text-emerald-600 bg-emerald-50 p-1 rounded-md rotate-180" />}
+                  {s.trend === 'stable' && <TrendingDown size={18} className="text-blue-500 bg-blue-50 p-1 rounded-md rotate-90" />}
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mt-1">{s.trend} profile</span>
+                </div>
+              </TableCell>
+            </motion.tr>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+    <div className="p-6 bg-slate-50/50 border-t border-slate-100 text-center">
+       <button className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] hover:text-slate-900 transition-colors">Load Detailed Registry (302 Students Remaining)</button>
+    </div>
+  </div>
+);

@@ -1,47 +1,50 @@
 'use client';
 
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 const data = [
-  { name: 'DS', completion: 65, color: '#4a7fcb' },
-  { name: 'OS', completion: 42, color: '#c94a4a' },
-  { name: 'DBMS', completion: 58, color: '#4a7fcb' },
-  { name: 'Java', completion: 82, color: '#4a9e6e' },
-  { name: 'SE', completion: 74, color: '#4a9e6e' },
-  { name: 'CN', completion: 35, color: '#c94a4a' },
+  { name: 'DS', completion: 45, full: 100, color: '#3b82f6' },
+  { name: 'OS', completion: 32, full: 100, color: '#f59e0b' },
+  { name: 'DBMS', completion: 68, full: 100, color: '#10b981' },
+  { name: 'MATH', completion: 25, full: 100, color: '#ef4444' },
+  { name: 'JAVA', completion: 55, full: 100, color: '#6366f1' },
 ];
 
-export const SubjectChart = () => {
-  return (
-    <Card className="h-full w-full p-10 bg-white border border-base-border rounded-[3rem] shadow-xl space-y-8 flex flex-col group overflow-hidden">
-      <CardHeader className="p-0 space-y-1">
-        <div className="flex items-center space-x-3 text-accent-blue-dark bg-accent-blue/30 w-fit px-4 py-1.5 rounded-full border border-accent-blue-mid/20 mb-2">
-           <TrendingUp size={16} />
-           <span className="text-[10px] font-black uppercase tracking-widest">Analysis View</span>
-        </div>
-        <CardTitle className="text-3xl font-black tracking-tighter">Subject Completion Avg.</CardTitle>
-        <p className="text-sm text-base-muted font-bold">Comprehensive overview of progress levels across core subjects.</p>
-      </CardHeader>
-      <CardContent className="p-0 flex-1 min-h-[300px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 13, fontWeight: 900, fill: '#0a0a0a' }} />
-            <YAxis hide />
-            <Tooltip 
-              cursor={{ fill: '#f9f9f9' }} 
-              contentStyle={{ borderRadius: '2rem', border: '1px solid #f0f0f0', boxShadow: '0 20px 40px rgba(0,0,0,0.05)', fontWeight: 900, fontSize: '12px' }}
-            />
-            <Bar dataKey="completion" radius={[12, 12, 0, 0]} barSize={48}>
-              {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.color} className="opacity-80 hover:opacity-100 transition-opacity" />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </CardContent>
-    </Card>
-  );
+const CustomTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white/95 backdrop-blur-md border border-slate-200 p-4 rounded-2xl shadow-xl">
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{payload[0].payload.name} Completion</p>
+        <p className="text-xl font-bold text-slate-900">{payload[0].value}% <span className="text-xs font-normal opacity-40">done</span></p>
+      </div>
+    );
+  }
+  return null;
 };
+
+export const SubjectChart = () => (
+  <div className="h-[300px] w-full mt-4">
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={data} margin={{ top: 0, right: 30, left: -20, bottom: 0 }}>
+        <XAxis 
+          dataKey="name" 
+          axisLine={false} 
+          tickLine={false} 
+          tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b', transform: 'translate(0, 5)' }}
+        />
+        <YAxis hide />
+        <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc', radius: [12, 12, 0, 0] }} />
+        <Bar 
+          dataKey="completion" 
+          radius={[10, 10, 10, 10]} 
+          barSize={40}
+          animationDuration={1500}
+        >
+          {data.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={entry.color} fillOpacity={0.8} stroke={entry.color} strokeWidth={2} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  </div>
+);

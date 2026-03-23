@@ -3,167 +3,149 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { syllabus } from '@/data/syllabus';
-import { askAIChat } from '@/lib/claude';
-import { Send, MessageSquare, Brain, User, Bot, Sparkles } from 'lucide-react';
+import { askAIChat } from '@/lib/gemini';
+import { Send, Bot, User, Sparkles } from 'lucide-react';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+
+interface Msg { role: 'user' | 'model'; content: string; }
 
 export const AskAI = () => {
-  const [selectedTopicId, setSelectedTopicId] = useState('');
-  const [messages, setMessages] = useState<any[]>([]);
+  const [topicId, setTopicId] = useState('');
+  const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const allTopics = syllabus.flatMap(sem => sem.subjects.flatMap(s => s.units.flatMap(u => ({
-    ...u.topics.map(t => ({ ...t, subject: s.name, unit: u.name }))
-  }))).flat()) as any[];
-
-  const currentTopic = allTopics.find(t => t.id === selectedTopicId);
+  const sem = syllabus[0];
+  const allTopics = sem.subjects.flatMap(s =>
+    s.units.flatMap(u => u.topics.map(t => ({ ...t, subject: s.name, unit: u.name })))
+  );
+  const currentTopic = allTopics.find(t => t.id === topicId);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages, loading]);
 
-  const handleSend = async (e: React.FormEvent) => {
+  const send = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || !selectedTopicId) return;
-
-    const userMsg = { role: 'user', content: input };
-    setMessages(prev => [...prev, userMsg]);
+    if (!input.trim() || !topicId) return;
+    const userMsg: Msg = { role: 'user', content: input };
+    const nextHistory = [...messages, userMsg];
+    setMessages(nextHistory);
     setInput('');
     setLoading(true);
-
     try {
       const resp = await askAIChat(
-        currentTopic.name,
-        currentTopic.subject,
-        currentTopic.unit,
-        messages,
-        input
+        currentTopic!.name, currentTopic!.subject, currentTopic!.unit,
+        messages, input
       );
-      setMessages(prev => [...prev, { role: 'assistant', content: resp }]);
-    } catch (err) {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Something went wrong. Please check your connection.' }]);
+      setMessages([...nextHistory, { role: 'model', content: resp }]);
+    } catch {
+      setMessages([...nextHistory, { role: 'model', content: 'Error contacting Gemini. Check your API key.' }]);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)] max-w-5xl mx-auto space-y-8 pb-10">
-      <Card className="rounded-[2.5rem] border-base-border shadow-md bg-white p-8">
-        <CardContent className="p-0 flex items-center space-x-10">
-          <div className="flex-1 space-y-2">
-            <label className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-base-muted">Focus Topic</label>
-            <Select value={selectedTopicId} onValueChange={setSelectedTopicId}>
-              <SelectTrigger className="w-full h-14 px-6 bg-base-surface border-base-border rounded-2xl font-bold text-base shadow-sm hover:bg-white transition-all">
-                <SelectValue placeholder="Select a topic to discuss..." />
-              </SelectTrigger>
-              <SelectContent className="rounded-3xl border-base-border shadow-2xl p-3 max-h-80">
-                {syllabus[0].subjects.map(subject => (
-                  <SelectGroup key={subject.id} className="mb-4">
-                    <SelectLabel className="text-[10px] uppercase font-black text-accent-blue-dark tracking-widest mb-2 ml-2">
-                      {subject.name}
-                    </SelectLabel>
-                    {subject.units.flatMap(u => u.topics).map(topic => (
-                      <SelectItem key={topic.id} value={topic.id} className="rounded-2xl font-bold py-3 px-4 transition-colors">
-                        {topic.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
+    <div className="flex flex-col h-[calc(100vh-140px)]">
+      {/* Topic select */}
+      <div className="mb-4">
+        <Select value={topicId} onValueChange={id => { setTopicId(id); setMessages([]); }}>
+          <SelectTrigger className="w-full h-10 border-app-border bg-white rounded-xl text-sm font-medium shadow-none">
+            <SelectValue placeholder="Select a topic…" />
+          </SelectTrigger>
+          <SelectContent className="rounded-xl border-app-border shadow-md max-h-72">
+            {sem.subjects.map(s => (
+              <SelectGroup key={s.id}>
+                <SelectLabel className="text-[10px] font-semibold text-app-muted uppercase tracking-wider px-3 pt-2">{s.name}</SelectLabel>
+                {s.units.flatMap(u => u.topics).map(t => (
+                  <SelectItem key={t.id} value={t.id} className="text-sm font-medium">{t.name}</SelectItem>
                 ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-16 h-16 bg-black text-white rounded-[1.5rem] flex items-center justify-center shadow-xl shadow-black/10 transform hover:scale-110 active:scale-95 transition-all">
-            <Brain size={32} />
-          </div>
-        </CardContent>
-      </Card>
+              </SelectGroup>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-      <Card className="flex-1 bg-white border border-base-border rounded-[3rem] shadow-xl overflow-hidden flex flex-col relative">
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-10 space-y-10 scroll-smooth">
-          {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center space-y-6 opacity-60">
-              <div className="w-20 h-20 bg-base-surface rounded-full flex items-center justify-center text-base-text border-2 border-dashed border-base-border">
-                <Sparkles size={40} className="text-accent-blue-mid" />
-              </div>
-              <div className="space-y-2">
-                <h3 className="text-2xl font-extrabold tracking-tight">Ask anything about {currentTopic?.name || 'BCA syllabus'}</h3>
-                <p className="text-base font-medium text-base-muted max-w-sm mx-auto">Master complex concepts with real-time AI guidance from Claude Sonnet.</p>
-              </div>
+      {/* Chat window */}
+      <div className="flex-1 border border-app-border rounded-xl bg-white overflow-hidden flex flex-col shadow-none">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-5">
+          {messages.length === 0 && (
+            <div className="h-full flex flex-col items-center justify-center text-center gap-3 text-app-muted">
+              <Sparkles size={28} />
+              <p className="text-sm font-medium">
+                {topicId ? `Ask anything about ${currentTopic?.name}…` : 'Select a topic above to start.'}
+              </p>
             </div>
-          ) : (
-            <AnimatePresence initial={false}>
-              {messages.map((m, i) => (
-                <motion.div 
-                   key={i}
-                   initial={{ opacity: 0, y: 30, scale: 0.98 }}
-                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                   className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} items-start space-x-5`}
-                >
-                  {m.role === 'assistant' && (
-                    <div className="w-12 h-12 bg-black text-white rounded-[1.25rem] flex-shrink-0 flex items-center justify-center shadow-lg transform translate-y-2">
-                      <Bot size={24} />
-                    </div>
-                  )}
-                  <div className={`max-w-[80%] p-8 rounded-[2rem] shadow-sm border leading-relaxed ${
-                    m.role === 'user' 
-                      ? 'bg-accent-blue/40 border-accent-blue-mid/30 text-accent-blue-dark rounded-tr-none font-bold text-sm' 
-                      : 'bg-base-surface border-base-border rounded-tl-none text-base-text font-medium text-sm'
-                  }`}>
-                    <p className="whitespace-pre-wrap">{m.content}</p>
-                  </div>
-                  {m.role === 'user' && (
-                    <div className="w-12 h-12 bg-base-surface border border-base-border rounded-[1.25rem] flex-shrink-0 flex items-center justify-center transform translate-y-2">
-                      <MessageSquare size={24} className="text-base-muted" />
-                    </div>
-                  )}
-                </motion.div>
-              ))}
-              {loading && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start items-center space-x-5">
-                  <div className="w-12 h-12 bg-black text-white rounded-[1.25rem] flex-shrink-0 flex items-center justify-center animate-pulse">
-                     <Bot size={24} />
-                  </div>
-                  <div className="bg-base-surface border border-base-border p-5 rounded-[2rem] rounded-tl-none px-8">
-                    <div className="flex space-x-2">
-                      <div className="w-2 h-2 bg-base-muted rounded-full animate-bounce" />
-                      <div className="w-2 h-2 bg-base-muted rounded-full animate-bounce [animation-delay:0.2s]" />
-                      <div className="w-2 h-2 bg-base-muted rounded-full animate-bounce [animation-delay:0.4s]" />
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
           )}
+          <AnimatePresence initial={false}>
+            {messages.map((m, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={cn('flex gap-3 items-start', m.role === 'user' ? 'justify-end' : 'justify-start')}
+              >
+                {m.role === 'model' && (
+                  <div className="w-8 h-8 rounded-lg bg-neutral-100 border border-app-border flex items-center justify-center shrink-0">
+                    <Bot size={14} className="text-app-muted" />
+                  </div>
+                )}
+                <div
+                  className={cn(
+                    'max-w-[75%] px-4 py-3 rounded-xl text-sm leading-relaxed',
+                    m.role === 'user'
+                      ? 'bg-black text-white rounded-tr-sm'
+                      : 'bg-neutral-50 border border-app-border text-app-text rounded-tl-sm'
+                  )}
+                >
+                  {m.content}
+                </div>
+                {m.role === 'user' && (
+                  <div className="w-8 h-8 rounded-lg bg-neutral-100 border border-app-border flex items-center justify-center shrink-0">
+                    <User size={14} className="text-app-muted" />
+                  </div>
+                )}
+              </motion.div>
+            ))}
+            {loading && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3 items-start">
+                <div className="w-8 h-8 rounded-lg bg-neutral-100 border border-app-border flex items-center justify-center shrink-0">
+                  <Bot size={14} className="text-app-muted" />
+                </div>
+                <div className="bg-neutral-50 border border-app-border px-4 py-3 rounded-xl rounded-tl-sm flex gap-1.5">
+                  {[0, 1, 2].map(k => (
+                    <span key={k} className="w-1.5 h-1.5 bg-app-muted rounded-full animate-bounce" style={{ animationDelay: `${k * 0.15}s` }} />
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        <form onSubmit={handleSend} className="p-8 bg-base-surface border-t border-base-border overflow-hidden">
-          <div className="relative group max-w-4xl mx-auto">
-            <Input 
-              type="text" 
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={selectedTopicId ? `Ask Claude about ${currentTopic?.name}...` : 'Select a topic first...'}
-              disabled={!selectedTopicId || loading}
-              className="w-full h-16 pl-8 pr-20 bg-white border border-base-border rounded-[1.75rem] focus-visible:ring-accent-blue-mid shadow-lg shadow-black/5 text-base font-bold transition-all disabled:opacity-50"
-            />
-            <Button 
-              type="submit"
-              disabled={!input.trim() || loading}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-12 h-12 bg-black text-white rounded-[1.25rem] shadow-xl hover:bg-accent-blue-mid active:scale-95 transition-all disabled:opacity-30 p-0"
-            >
-              <Send size={20} />
-            </Button>
-          </div>
+        {/* Input */}
+        <form onSubmit={send} className="border-t border-app-border p-4 flex gap-3">
+          <input
+            type="text"
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            disabled={!topicId || loading}
+            placeholder={topicId ? `Ask about ${currentTopic?.name}…` : 'Select a topic first…'}
+            className="flex-1 bg-neutral-50 border border-app-border rounded-lg px-4 py-2 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-neutral-300 placeholder:text-app-muted disabled:opacity-50"
+          />
+          <Button
+            type="submit"
+            disabled={!input.trim() || loading}
+            size="icon"
+            className="bg-black text-white hover:bg-neutral-800 rounded-lg w-10 h-10 shrink-0"
+          >
+            <Send size={15} />
+          </Button>
         </form>
-      </Card>
+      </div>
     </div>
   );
 };

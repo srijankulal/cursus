@@ -50,14 +50,19 @@ export default function LandingPage() {
             and uses Gemini AI to build you a personalised study plan.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2 px-4 max-w-4xl mx-auto flex-wrap">
             <Link href="/student">
-              <Button className="h-11 px-8 bg-black text-white hover:bg-neutral-800 rounded-xl font-medium gap-2">
-                Student Portal <ArrowRight size={16} />
+              <Button className="h-11 px-8 bg-black text-white hover:bg-neutral-800 rounded-xl font-bold gap-2">
+                Student <ArrowRight size={16} />
+              </Button>
+            </Link>
+            <Link href="/staff">
+              <Button variant="outline" className="h-11 px-8 rounded-xl font-bold border-app-border text-app-text hover:bg-neutral-50 bg-white shadow-sm">
+                Staff Portal
               </Button>
             </Link>
             <Link href="/hod">
-              <Button variant="outline" className="h-11 px-8 rounded-xl font-medium border-app-border text-app-text hover:bg-neutral-50">
+              <Button variant="outline" className="h-11 px-8 rounded-xl font-bold border-app-border text-app-text hover:bg-neutral-50 bg-white shadow-sm">
                 HOD Dashboard
               </Button>
             </Link>

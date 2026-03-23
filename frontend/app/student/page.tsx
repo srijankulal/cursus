@@ -10,57 +10,105 @@ import { AskAI } from '@/components/student/AskAI';
 import { syllabus } from '@/data/syllabus';
 import { storage } from '@/lib/storage';
 
-export default function StudentPage() {
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [progress, setProgress] = useState(0);
+const TITLES: Record<string, { title: string; sub: string; hue: string }> = {
+  dashboard:    { title: 'Overview',   sub: 'Your risk status and recent progress at a glance.', hue: 'bg-blue-600' },
+  syllabus:     { title: 'Syllabus Explorer',    sub: 'Browse topics, mark them done, and identify high-yield areas.', hue: 'bg-amber-500' },
+  'study-plan': { title: 'AI Study Plan',  sub: 'Let Gemini AI build a day-by-day plan based on what\'s left.', hue: 'bg-emerald-600' },
+  'ask-ai':     { title: 'Ask Gemini',      sub: 'Have a conversation with AI about specific BCA topics.', hue: 'bg-indigo-600' },
+};
 
-  const currentSemester = syllabus[0];
+export default function StudentPage() {
+  const [tab, setTab] = useState('dashboard');
+  const [progress, setProgress] = useState(0);
+  const [collapsed, setCollapsed] = useState(false);
+  const sem = syllabus[0];
 
   useEffect(() => {
-    const completed = storage.getCompletedTopics();
-    const total = currentSemester.subjects.flatMap(s => s.units.flatMap(u => u.topics)).length;
-    setProgress(Math.round((completed.length / total) * 100));
-  }, [activeTab]);
+    const done = storage.getCompletedTopics().length;
+    const total = sem.subjects.flatMap(s => s.units.flatMap(u => u.topics)).length;
+    setProgress(Math.round((done / total) * 100));
+  }, [tab]);
+
+  const page = TITLES[tab] ?? TITLES.dashboard;
 
   const renderContent = () => {
-    switch (activeTab) {
-      case 'dashboard': return <Dashboard />;
-      case 'syllabus': return <Syllabus activeSemesterId={currentSemester.id} />;
-      case 'study-plan': return <StudyPlan />;
-      case 'ask-ai': return <AskAI />;
-      default: return <Dashboard />;
+    switch (tab) {
+      case 'dashboard':   return <Dashboard />;
+      case 'syllabus':    return <Syllabus activeSemesterId={sem.id} />;
+      case 'study-plan':  return <StudyPlan />;
+      case 'ask-ai':      return <AskAI />;
+      default:            return <Dashboard />;
     }
   };
 
   return (
-    <div className="min-h-screen bg-base-bg flex selection:bg-accent-blue/50 selection:text-accent-blue-dark">
-      <Sidebar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        semesterName={currentSemester.name}
+    <div className="flex h-screen bg-app-bg text-app-text overflow-hidden">
+      <Sidebar
+        activeTab={tab}
+        setActiveTab={setTab}
+        semesterName={sem.name}
         progress={progress}
+        collapsed={collapsed}
+        setCollapsed={setCollapsed}
       />
-      
-      <main className="flex-1 p-10 mt-5 max-w-7xl mx-auto overflow-y-auto h-screen bg-white">
-        <motion.div
-           key={activeTab}
-           initial={{ opacity: 0, x: 10 }}
-           animate={{ opacity: 1, x: 0 }}
-           transition={{ duration: 0.2 }}
-           className="w-full h-full"
-        >
-          <header className="mb-12">
-            <h1 className="text-4xl font-extrabold tracking-tight capitalize">{activeTab.replace('-', ' ')}</h1>
-            <p className="text-base-muted font-medium mt-1">
-              Welcome back to Cursus. {activeTab === 'dashboard' ? 'Here is your current focus.' : `Explore your ${activeTab.replace('-', ' ')}.`}
-            </p>
+
+      <main className="flex-1 overflow-y-auto flex flex-col bg-app-bg">
+        {/* Workspace Card Container */}
+        <div className="flex-1 flex flex-col m-3 sm:m-6 bg-app-surface rounded-[1.25rem] border border-app-border shadow-premium overflow-hidden">
+          
+          {/* Header Area */}
+          <header className="px-8 py-6 border-b border-app-border shrink-0 flex items-center justify-between">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={tab}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 10 }}
+                transition={{ duration: 0.2 }}
+                className="flex items-center gap-5"
+              >
+                <div className={cn('w-1.5 h-10 rounded-full', page.hue)} />
+                <div className="min-w-0">
+                  <h1 className="text-xl font-bold tracking-tight text-neutral-900">{page.title}</h1>
+                  <p className="text-[13px] text-app-muted mt-0.5 line-clamp-1">{page.sub}</p>
+                </div>
+              </motion.div>
+            </AnimatePresence>
+            
+            <div className="flex -space-x-2 shrink-0">
+               {[1, 2, 3].map(i => (
+                 <div key={i} className="w-8 h-8 rounded-full border-2 border-white bg-neutral-100 flex items-center justify-center text-[10px] font-bold text-neutral-400">
+                   {i}
+                 </div>
+               ))}
+               <div className="w-8 h-8 rounded-full border-2 border-white bg-neutral-900 flex items-center justify-center text-[10px] font-bold text-white">
+                 +
+               </div>
+            </div>
           </header>
 
-          <div className="pb-10">
-            {renderContent()}
+          {/* Dynamic Content Panel */}
+          <div className="flex-1 overflow-y-auto px-8 py-10">
+            <div className="max-w-4xl mx-auto">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={tab}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.25, ease: 'easeOut' }}
+                >
+                  {renderContent()}
+                </motion.div>
+              </AnimatePresence>
+            </div>
           </div>
-        </motion.div>
+        </div>
       </main>
     </div>
   );
+}
+
+function cn(...inputs: any[]) {
+  return inputs.filter(Boolean).join(' ');
 }
