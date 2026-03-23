@@ -1,152 +1,148 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { generateStudyPlan, StudyPlanItem } from '@/lib/gemini';
+import { syllabus } from '@/data/syllabus';
 import { storage } from '@/lib/storage';
-import { syllabus, EXAM_DATE_DEFAULT } from '@/data/syllabus';
-import { generateStudyPlan } from '@/lib/claude';
-import { Calendar, Brain, Clock, Zap, RefreshCw, Star } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Sparkles, Calendar, Target, TrendingUp, PartyPopper, Clock, CheckCircle2, FlaskConical } from 'lucide-react';
 
 export const StudyPlan = () => {
-  const [examDate, setExamDate] = useState<string>('');
-  const [plan, setPlan] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [pace, setPace] = useState('Steady');
+  const [pace, setPace] = useState('moderate');
+  const [plan, setPlan] = useState<StudyPlanItem[]>([]);
 
-  useEffect(() => {
-    const savedDate = storage.getExamDate() || EXAM_DATE_DEFAULT;
-    setExamDate(savedDate.toISOString().split('T')[0]);
-    
-    const savedPlan = storage.getStudyPlan();
-    if (savedPlan) setPlan(savedPlan);
-  }, []);
-
-  const handleGenerate = async () => {
+  const generate = async () => {
     setLoading(true);
-    const completedIds = storage.getCompletedTopics();
-    const allTopics = syllabus[0].subjects.flatMap(s => s.units.flatMap(u => u.topics));
-    const remaining = allTopics.filter(t => !completedIds.includes(t.id)).map(t => t.name);
-    
-    const generatedPlan = await generateStudyPlan(remaining, new Date(examDate), pace);
-    setPlan(generatedPlan);
-    storage.setStudyPlan(generatedPlan);
+    const completed = storage.getCompletedTopics();
+    const todo = syllabus[0].subjects.flatMap(s => 
+      s.units.flatMap(u => 
+        u.topics.filter(t => !completed.includes(t.id)).map(t => ({ ...t, subject: s.name }))
+      )
+    );
+    const result = await generateStudyPlan(todo, pace);
+    setPlan(result);
     setLoading(false);
   };
 
-  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newDate = new Date(e.target.value);
-    setExamDate(e.target.value);
-    storage.setExamDate(newDate);
-  };
-
   return (
-    <div className="space-y-10">
-      <Card className="rounded-[2rem] border-base-border shadow-sm p-8 bg-white overflow-hidden">
-        <CardContent className="p-0 flex flex-col md:flex-row md:items-end justify-between gap-10">
-          <div className="flex-1 space-y-4">
-            <h2 className="text-3xl font-extrabold tracking-tight">AI Study Planner</h2>
-            <p className="text-sm text-base-muted font-medium">Personalize your journey. Tell Claude when you're taking the exam and how hard you want to study.</p>
-            
-            <div className="flex flex-wrap gap-8 items-end pt-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-base-muted">Exam Date</label>
-                <div className="relative group">
-                  <Calendar size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-base-muted group-hover:text-base-text transition-colors" />
-                  <input 
-                    type="date" 
-                    value={examDate}
-                    onChange={handleDateChange}
-                    className="pl-12 pr-6 py-3 bg-base-surface border border-base-border rounded-2xl focus:outline-none focus:ring-1 focus:ring-accent-blue-mid text-sm font-bold shadow-sm cursor-pointer hover:bg-white transition-colors"
-                  />
-                </div>
-              </div>
+    <div className="space-y-10 pb-16">
+      {/* Configuration Hub */}
+      <div className="p-8 rounded-[1.5rem] bg-gradient-to-br from-indigo-50/50 via-white to-blue-50/50 border border-indigo-100 shadow-premium flex flex-col items-center text-center gap-6 relative overflow-hidden group">
+        <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/5 blur-[80px] -mr-24 -mt-24 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-500/5 blur-[80px] -ml-24 -mb-24 pointer-events-none" />
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-base-muted">Intensity Level</label>
-                <Select value={pace} onValueChange={setPace}>
-                  <SelectTrigger className="w-40 py-6 px-6 bg-base-surface border-base-border rounded-2xl font-bold text-sm shadow-sm hover:bg-white transition-all">
-                    <SelectValue placeholder="Pace" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-2xl border-base-border/50 shadow-xl p-2">
-                    <SelectItem value="Light" className="rounded-xl font-bold py-3">Light</SelectItem>
-                    <SelectItem value="Steady" className="rounded-xl font-bold py-3">Steady</SelectItem>
-                    <SelectItem value="Intense" className="rounded-xl font-bold py-3">Intense</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+        <div className="w-14 h-14 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg transform group-hover:rotate-6 transition-transform">
+          <Sparkles size={28} />
+        </div>
+        
+        <div className="max-w-md">
+          <h2 className="text-2xl font-black tracking-tight text-neutral-900 mb-2">Build your AI Roadmap</h2>
+          <p className="text-[13px] font-medium text-app-muted leading-relaxed">
+            Gemini will generate a topic-by-topic schedule optimized for your pace and high-yield content.
+          </p>
+        </div>
 
-              <Button
-                 onClick={handleGenerate}
-                 disabled={loading}
-                 className="h-[52px] px-10 bg-black text-white hover:bg-accent-blue-mid rounded-2xl font-bold text-sm shadow-lg shadow-black/10 flex items-center space-x-3 active:scale-95 transition-all disabled:opacity-50"
-              >
-                {loading ? <RefreshCw className="animate-spin" size={18} /> : <Brain size={20} />}
-                <span>{plan.length > 0 ? 'Regenerate Plan' : 'Generate Plan'}</span>
-              </Button>
-            </div>
+        <div className="flex flex-col sm:flex-row items-center gap-4 w-full justify-center mt-2 group">
+          <div className="flex flex-col items-start gap-1 w-full sm:w-auto">
+            <span className="text-[10px] font-black text-app-muted uppercase tracking-[0.2em] ml-2">Study Intensity</span>
+            <Select value={pace} onValueChange={setPace}>
+              <SelectTrigger className="w-full sm:w-44 h-11 bg-white border-app-border rounded-xl font-bold text-sm shadow-sm hover:border-indigo-400 transition-colors">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl border-app-border shadow-md">
+                <SelectItem value="light" className="font-bold py-2.5">Light Pace</SelectItem>
+                <SelectItem value="moderate" className="font-bold py-2.5">Moderate</SelectItem>
+                <SelectItem value="intensive" className="font-bold py-2.5 text-orange-600">Intensive Burn</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        <AnimatePresence mode="popLayout">
-          {plan.map((day, i) => (
-            <motion.div
-               key={i}
-               initial={{ opacity: 0, y: 30, scale: 0.95 }}
-               animate={{ opacity: 1, y: 0, scale: 1 }}
-               exit={{ opacity: 0, scale: 0.95 }}
-               transition={{ delay: i * 0.08, type: 'spring', damping: 20 }}
-               className="h-full"
-            >
-              <Card className="rounded-[2.5rem] border-base-border shadow-md hover:shadow-xl hover:-translate-y-2 transition-all p-8 bg-white flex flex-col h-full overflow-hidden group">
-                <div className="flex justify-between items-start mb-8">
-                  <div>
-                     <p className="text-[10px] font-extrabold text-accent-blue-dark bg-accent-blue/40 px-3 py-1 rounded-full mb-3 inline-block uppercase tracking-widest">
-                       Day {i + 1}
-                     </p>
-                     <h3 className="text-xl font-extrabold tracking-tight">
-                       {new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} — {new Date(day.date).toLocaleDateString('en-US', { weekday: 'long' })}
-                     </h3>
-                  </div>
-                  <div className="flex items-center space-x-2 text-base-muted font-bold text-xs bg-base-surface px-4 py-2 rounded-2xl border border-base-border/50 group-hover:bg-accent-blue group-hover:text-accent-blue-dark transition-colors">
-                    <Clock size={14} />
-                    <span>{day.time}m</span>
-                  </div>
-                </div>
-
-                <div className="space-y-3 flex-1">
-                  {day.topics.map((topic: string, j: number) => {
-                     const isHY = syllabus[0].subjects.flatMap(s => s.units.flatMap(u => u.topics)).find(t => t.name === topic)?.isHighYield;
-                     return (
-                      <div key={j} className={`p-4 rounded-3xl flex items-center space-x-4 transition-all ${isHY ? 'bg-accent-blue/20 border border-accent-blue-mid/20' : 'bg-base-surface/50 border border-base-border'}`}>
-                        <div className={`w-2.5 h-2.5 rounded-full ${isHY ? 'bg-accent-blue-dark shadow-[0_0_10px_rgba(30,58,95,0.4)]' : 'bg-base-muted'}`} />
-                        <span className="text-xs font-bold flex-1 truncate">{topic}</span>
-                        {isHY && <Star size={14} className="text-accent-blue-dark fill-accent-blue-dark" />}
-                      </div>
-                     );
-                  })}
-                </div>
-              </Card>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+          
+          <Button
+            onClick={generate}
+            disabled={loading}
+            className="w-full sm:w-auto h-11 px-8 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm shadow-md transition-all active:scale-95 flex items-center gap-3 mt-5 sm:mt-0"
+          >
+            {loading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>BUILDING...</span>
+              </>
+            ) : (
+              <>
+                <TrendingUp size={18} />
+                <span>GENERATE MASTERPLAN</span>
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
-      {plan.length === 0 && !loading && (
-        <Card className="p-32 text-center space-y-6 border-dashed border-2 border-base-border bg-base-surface/20 rounded-[3rem]">
-          <div className="w-20 h-20 bg-white border border-base-border rounded-full flex items-center justify-center mx-auto text-base-muted shadow-sm">
-            <Zap size={40} className="text-accent-blue-mid" />
+      {/* The Roadmap */}
+      <AnimatePresence mode="wait">
+        {plan.length > 0 ? (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-6"
+          >
+            <div className="flex items-center gap-4 px-2">
+              <h3 className="text-[11px] font-bold text-app-muted uppercase tracking-[0.2em]">Personal Roadmap</h3>
+              <div className="flex-1 h-px bg-app-border/60" />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {plan.map((item, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.1 * i }}
+                  className="p-6 rounded-2xl bg-white border border-app-border shadow-sm hover:shadow-md transition-all flex flex-col relative group h-full cursor-pointer overflow-hidden"
+                >
+                   {/* Background Number Accent */}
+                   <span className="absolute -right-2 top-0 text-[120px] font-bold opacity-5 text-neutral-400 select-none group-hover:scale-110 group-hover:opacity-10 transition-all pointer-events-none">
+                     {i+1}
+                   </span>
+                   
+                   <div className="flex items-start justify-between mb-4 relative z-10">
+                     <span className="px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-100 text-[10px] font-bold text-indigo-600 uppercase tracking-widest leading-none">
+                       Day {item.day}
+                     </span>
+                     <FlaskConical size={18} className="text-neutral-300 group-hover:text-indigo-400 transition-colors" />
+                   </div>
+
+                   <div className="flex-1 relative z-10">
+                     <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-[0.1em] mb-1">{item.subject}</p>
+                     <p className="text-base font-bold text-neutral-800 leading-snug group-hover:text-indigo-600 transition-colors">{item.topic}</p>
+                   </div>
+
+                   <div className="mt-6 flex items-center gap-2 relative z-10 pt-4 border-t border-dotted border-app-border">
+                     <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" />
+                     <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-tight">{item.estimatedTime}</p>
+                   </div>
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Achievement Footer */}
+            <div className="p-8 rounded-[1.5rem] bg-emerald-50 border border-emerald-100/50 flex flex-col items-center justify-center text-center gap-2">
+              <div className="w-10 h-10 rounded-xl bg-white border border-emerald-200 flex items-center justify-center shadow-sm text-emerald-600 mb-1">
+                <PartyPopper size={20} />
+              </div>
+              <p className="text-sm font-black text-emerald-900">Finish topics to update your plan.</p>
+              <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest opacity-80">STAY CONSISTENT, STAY AHEAD</p>
+            </div>
+          </motion.div>
+        ) : !loading && (
+          <div className="py-20 flex flex-col items-center justify-center text-center opacity-30 select-none pointer-events-none">
+            <Calendar size={64} strokeWidth={1} className="mb-4" />
+            <p className="text-sm font-bold max-w-xs">Enter your exam date in Settings to see exact day counts.</p>
           </div>
-          <div className="space-y-2">
-            <h3 className="text-2xl font-extrabold tracking-tight">Your AI Roadmap is Ready</h3>
-            <p className="text-base-muted max-w-sm mx-auto font-medium">Tell Claude your exam goals and get a personalized day-by-day study schedule instantly.</p>
-          </div>
-        </Card>
-      )}
+        )}
+      </AnimatePresence>
     </div>
   );
 };

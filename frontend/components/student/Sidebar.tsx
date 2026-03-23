@@ -1,72 +1,153 @@
 'use client';
 
-import { motion } from 'framer-motion';
-import { Home, BookOpen, Calendar, MessageSquare, ChevronRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Home, BookOpen, Calendar, MessageSquare, PanelLeftClose, PanelLeftOpen, GraduationCap, Sparkles } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import { cn } from '@/lib/utils';
 
 interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   semesterName: string;
   progress: number;
+  collapsed: boolean;
+  setCollapsed: (v: boolean) => void;
 }
 
-export const Sidebar = ({ activeTab, setActiveTab, semesterName, progress }: SidebarProps) => {
-  const tabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: Home },
-    { id: 'syllabus', label: 'Syllabus', icon: BookOpen },
-    { id: 'study-plan', label: 'Study Plan', icon: Calendar },
-    { id: 'ask-ai', label: 'Ask AI', icon: MessageSquare },
-  ];
+const tabs = [
+  { id: 'dashboard',  label: 'Dashboard',  icon: Home,       hue: 'hover:text-blue-500 hover:bg-blue-50/50', active: 'bg-blue-600 text-white shadow-blue-500/20 shadow-lg' },
+  { id: 'syllabus',   label: 'Syllabus',    icon: BookOpen,   hue: 'hover:text-amber-500 hover:bg-amber-50/50',  active: 'bg-amber-500 text-white shadow-amber-500/20 shadow-lg' },
+  { id: 'study-plan', label: 'Study Plan',  icon: Calendar,   hue: 'hover:text-emerald-500 hover:bg-emerald-50/50', active: 'bg-emerald-600 text-white shadow-emerald-500/20 shadow-lg' },
+  { id: 'ask-ai',     label: 'Ask AI',      icon: MessageSquare, hue: 'hover:text-indigo-500 hover:bg-indigo-50/50', active: 'bg-indigo-600 text-white shadow-indigo-500/20 shadow-lg' },
+];
 
-  return (
-    <aside className="w-80 border-r border-base-border h-screen bg-white flex flex-col p-10 sticky top-0 overflow-y-auto shadow-[20px_0_40px_rgba(0,0,0,0.02)] z-50">
-      <div className="flex items-center space-x-4 mb-16">
-        <div className="w-12 h-12 rounded-2xl bg-black text-white flex items-center justify-center font-black text-xl shadow-lg transform -rotate-6">C</div>
-        <span className="text-2xl font-black tracking-tighter">Cursus</span>
+export const Sidebar = ({
+  activeTab, setActiveTab, semesterName, progress, collapsed, setCollapsed,
+}: SidebarProps) => (
+  <motion.aside
+    animate={{ width: collapsed ? 72 : 248 }}
+    transition={{ type: 'spring', stiffness: 280, damping: 32 }}
+    className="relative shrink-0 flex flex-col h-screen bg-slate-50 border-r border-slate-200 overflow-visible z-20"
+    style={{ boxShadow: '12px 0 32px -16px rgba(0,0,0,0.08)' }}
+  >
+    {/* Sidebar Container */}
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Brand Header */}
+      <div className={cn(
+        'flex items-center h-[72px] border-b border-slate-200 shrink-0 px-4 transition-all',
+        collapsed ? 'justify-center' : 'gap-4'
+      )}>
+        {collapsed ? (
+          <button
+            onClick={() => setCollapsed(false)}
+            className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shadow-slate-900/10"
+            title="Expand Cursus"
+          >
+            <span className="text-white text-sm font-black leading-none uppercase">C</span>
+          </button>
+        ) : (
+          <>
+            <div className="w-10 h-10 bg-slate-950 rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-slate-900/10 transition-transform active:scale-95 cursor-pointer">
+              <span className="text-white text-sm font-black leading-none uppercase">C</span>
+            </div>
+            <motion.span
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="font-black text-sm text-slate-900 tracking-tighter flex-1 whitespace-nowrap overflow-hidden pr-2 uppercase"
+            >
+              Cursus <span className="text-[10px] font-bold text-slate-400 opacity-70 ml-1">v1.2</span>
+            </motion.span>
+            <button
+              onClick={() => setCollapsed(true)}
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-900 hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 transition-all active:scale-90"
+              title="Minimize Workspace"
+            >
+              <PanelLeftClose size={17} />
+            </button>
+          </>
+        )}
       </div>
 
-      <nav className="flex-1 space-y-3">
-        {tabs.map((tab) => (
-          <Button
-            key={tab.id}
-            variant={activeTab === tab.id ? 'secondary' : 'ghost'}
-            onClick={() => setActiveTab(tab.id)}
-            className={`w-full justify-start items-center space-x-4 h-14 rounded-2xl transition-all duration-300 ${
-              activeTab === tab.id
-                ? 'bg-base-surface text-base-text font-black shadow-inner translate-x-1'
-                : 'text-base-muted hover:bg-base-surface/50 hover:text-base-text hover:translate-x-1'
-            }`}
-          >
-            <div className={`p-2 rounded-xl transition-colors ${activeTab === tab.id ? 'bg-white' : 'bg-transparent'}`}>
-              <tab.icon size={20} className={activeTab === tab.id ? 'text-accent-blue-mid' : ''} />
-            </div>
-            <span className="text-sm">{tab.label}</span>
-            {activeTab === tab.id && (
-              <motion.div layoutId="active-nav-indicator" className="ml-auto w-1.5 h-6 bg-accent-blue-mid rounded-full" />
-            )}
-          </Button>
-        ))}
+      {/* Nav Items */}
+      <nav className={cn('flex-1 py-6 space-y-2 overflow-y-auto overflow-x-hidden transition-all', collapsed ? 'px-3' : 'px-4')}>
+        {tabs.map(tab => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                'group w-full flex items-center rounded-xl transition-all duration-300 h-11 relative',
+                collapsed ? 'justify-center px-0' : 'px-4 gap-4',
+                isActive
+                  ? tab.active
+                  : cn('text-slate-400 bg-transparent hover:font-bold', tab.hue)
+              )}
+            >
+              <tab.icon size={19} className={cn('shrink-0 transition-transform duration-300', isActive ? 'text-white' : 'group-hover:scale-110')} />
+              {!collapsed && (
+                <span className="text-[13px] font-black tracking-widest whitespace-nowrap overflow-hidden uppercase">
+                  {tab.label}
+                </span>
+              )}
+              {isActive && !collapsed && (
+                <motion.div layoutId="active-indicator" className="w-1 h-4 bg-white/40 rounded-full absolute right-3" />
+              )}
+              {collapsed && isActive && (
+                 <div className="absolute inset-0 rounded-xl bg-slate-900/5 ring-2 ring-slate-200/50" />
+              )}
+            </button>
+          );
+        })}
+
+        {/* Collapsed expand icon at bottom of nav */}
+        {collapsed && (
+          <div className="pt-4 border-t border-slate-200/60 mt-4 px-1">
+            <button
+              onClick={() => setCollapsed(false)}
+              className="w-full flex justify-center items-center h-11 text-slate-400 hover:text-slate-900 hover:bg-white rounded-xl transition-all active:scale-90 border border-transparent hover:border-slate-200 shadow-sm"
+              title="Expand workspace"
+            >
+              <PanelLeftOpen size={17} />
+            </button>
+          </div>
+        )}
       </nav>
 
-      <div className="mt-auto pt-10 border-t border-base-border space-y-8">
-        <div className="bg-base-surface/40 p-5 rounded-2xl border border-base-border/50">
-          <p className="text-[10px] font-black text-base-muted uppercase tracking-[0.2em] mb-2">Curriculum</p>
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-black text-base-text">{semesterName}</p>
-            <div className="w-2 h-2 rounded-full bg-accent-green-mid animate-pulse" />
+      {/* Semester/Mastery Footer */}
+      {!collapsed && (
+        <div className="px-4 py-8 border-t border-slate-200/60 space-y-6 shrink-0 bg-white/40 backdrop-blur-sm">
+          <div className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-slate-200 shadow-premium shadow-slate-200/20 group hover:border-indigo-200 transition-colors cursor-default">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 shadow-sm border border-indigo-100 group-hover:scale-110 transition-transform">
+              <GraduationCap size={18} className="shrink-0" />
+            </div>
+            <div className="min-w-0 flex flex-col justify-center">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5 opacity-80">Workspace</p>
+              <p className="text-sm font-black text-slate-900 truncate tracking-tight">{semesterName}</p>
+            </div>
+          </div>
+          
+          <div className="space-y-3 px-1">
+            <div className="flex justify-between items-end">
+              <div className="flex flex-col">
+                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest opacity-80">Full Mastery</span>
+                 <span className="text-xs font-black text-slate-900 mt-0.5 tracking-tighter">BCA Syllabus</span>
+              </div>
+              <div className="flex flex-col items-end">
+                 <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100 shadow-sm">{progress}%</span>
+              </div>
+            </div>
+            <div className="h-2 rounded-full bg-slate-200 overflow-hidden ring-1 ring-slate-300/30">
+               <motion.div
+                 initial={{ width: 0 }}
+                 animate={{ width: `${progress}%` }}
+                 transition={{ duration: 1, ease: 'easeOut' }}
+                 className="h-full bg-emerald-500 rounded-full shadow-lg"
+               />
+            </div>
           </div>
         </div>
-        
-        <div className="space-y-3">
-          <div className="flex justify-between items-center">
-            <span className="text-[10px] font-black text-base-muted uppercase tracking-widest">Mastery</span>
-            <span className="text-xs font-black text-accent-green-dark">{progress}%</span>
-          </div>
-          <Progress value={progress} className="h-2.5 bg-base-surface rounded-full overflow-hidden" />
-        </div>
-      </div>
-    </aside>
-  );
-};
+      )}
+    </div>
+  </motion.aside>
+);

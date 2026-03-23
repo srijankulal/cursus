@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { Users, CheckCircle2, AlertCircle, TrendingUp } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 interface StatsRowProps {
   totalStudents: number;
@@ -11,34 +11,34 @@ interface StatsRowProps {
   onTrack: number;
 }
 
-export const StatsRow = ({ totalStudents, avgCompletion, atRisk, onTrack }: StatsRowProps) => {
-  const stats = [
-    { label: 'Total Students', value: totalStudents, icon: Users, color: 'bg-base-surface text-base-text border-base-border/50' },
-    { label: 'Avg. Completion', value: `${avgCompletion}%`, icon: TrendingUp, color: 'bg-accent-blue/40 text-accent-blue-dark border-accent-blue-mid/20' },
-    { label: 'Students At Risk', value: atRisk, icon: AlertCircle, color: 'bg-accent-red/40 text-accent-red-dark border-accent-red-mid/20' },
-    { label: 'Students On Track', value: onTrack, icon: CheckCircle2, color: 'bg-accent-green/40 text-accent-green-dark border-accent-green-mid/20' },
-  ];
+const stats = (p: StatsRowProps) => [
+  { label: 'Total Students',    value: p.totalStudents,     icon: Users,         cls: 'bg-slate-100 text-slate-500',  accent: 'bg-slate-500' },
+  { label: 'Avg Completion',    value: `${p.avgCompletion}%`, icon: TrendingUp,  cls: 'bg-blue-50 text-blue-600',    accent: 'bg-blue-600' },
+  { label: 'At Risk',           value: p.atRisk,             icon: AlertCircle,  cls: 'bg-rose-50 text-rose-600',    accent: 'bg-rose-600' },
+  { label: 'On Track',          value: p.onTrack,            icon: CheckCircle2, cls: 'bg-emerald-50 text-emerald-600', accent: 'bg-emerald-600' },
+];
 
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-      {stats.map((stat, i) => (
-        <motion.div
-           key={i}
-           initial={{ opacity: 0, y: 20 }}
-           animate={{ opacity: 1, y: 0 }}
-           transition={{ delay: i * 0.1, type: 'spring' }}
-        >
-          <Card className={`p-8 rounded-[2.5rem] border shadow-sm border-base-border flex flex-col space-y-6 hover:shadow-xl transition-all hover:-translate-y-1 bg-white overflow-hidden group`}>
-            <div className={`w-14 h-14 rounded-[1.5rem] flex items-center justify-center border shadow-inner transition-all transform group-hover:rotate-6 ${stat.color}`}>
-              <stat.icon size={28} />
-            </div>
-            <CardContent className="p-0">
-              <p className="text-4xl font-black tracking-tighter text-base-text">{stat.value}</p>
-              <p className="text-[10px] font-extrabold text-base-muted uppercase tracking-[0.15em] mt-1">{stat.label}</p>
-            </CardContent>
-          </Card>
-        </motion.div>
-      ))}
-    </div>
-  );
-};
+export const StatsRow = (props: StatsRowProps) => (
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+    {stats(props).map((s, i) => (
+      <motion.div 
+        key={i} 
+        initial={{ opacity: 0, y: 12 }} 
+        animate={{ opacity: 1, y: 0 }} 
+        transition={{ delay: i * 0.1, duration: 0.4 }}
+        className="p-6 rounded-3xl border border-slate-200 bg-white shadow-premium hover:shadow-card-hover transition-all hover:-translate-y-1 relative overflow-hidden group"
+      >
+        <div className={cn("absolute -right-4 -top-4 w-20 h-20 opacity-5 group-hover:scale-125 transition-transform rounded-full", s.accent)} />
+        
+        <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center mb-6 shadow-sm border border-black/5 shrink-0', s.cls)}>
+          <s.icon size={18} />
+        </div>
+        
+        <div className="space-y-1">
+          <p className="text-3xl font-bold tracking-tight text-slate-900 leading-none">{s.value}</p>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.label}</p>
+        </div>
+      </motion.div>
+    ))}
+  </div>
+);

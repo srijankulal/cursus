@@ -2,153 +2,167 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { syllabus, Subject, Unit, Topic } from '@/data/syllabus';
+import { syllabus, Topic } from '@/data/syllabus';
 import { storage } from '@/lib/storage';
-import { Star, MessageCircle, CheckCircle2 } from 'lucide-react';
-import { 
-  Accordion, 
-  AccordionContent, 
-  AccordionItem, 
-  AccordionTrigger 
-} from '@/components/ui/accordion';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
+import { Sparkles, BookOpen, Target, Zap, ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export const Syllabus = ({ activeSemesterId }: { activeSemesterId: string }) => {
-  const [completedTopics, setCompletedTopics] = useState<string[]>([]);
+  const [completed, setCompleted] = useState<string[]>([]);
+  const [openSubject, setOpenSubject] = useState<string | null>(syllabus[0].id);
+  const [openUnit, setOpenUnit] = useState<string | null>(null);
+  const sem = syllabus.find(s => s.id === activeSemesterId) ?? syllabus[0];
 
-  const currentSemester = syllabus.find(s => s.id === activeSemesterId) || syllabus[0];
+  useEffect(() => { setCompleted(storage.getCompletedTopics()); }, []);
 
-  useEffect(() => {
-    setCompletedTopics(storage.getCompletedTopics());
-  }, []);
+  const toggle = (id: string) => setCompleted(storage.toggleTopicCompletion(id));
 
-  const toggleTopic = (id: string, checked: boolean) => {
-    const updated = storage.toggleTopicCompletion(id);
-    setCompletedTopics(updated);
-  };
-
-  const getProgress = (items: Topic[]) => {
-    if (items.length === 0) return 0;
-    const completed = items.filter(t => completedTopics.includes(t.id)).length;
-    return Math.round((completed / items.length) * 100);
-  };
+  const pct = (topics: Topic[]) =>
+    topics.length === 0 ? 0 : Math.round((topics.filter(t => completed.includes(t.id)).length / topics.length) * 100);
 
   return (
-    <div className="space-y-10">
-      <div className="flex justify-between items-center bg-white p-8 border border-base-border rounded-[2rem] shadow-sm">
-        <div className="space-y-1">
-          <h2 className="text-3xl font-extrabold tracking-tight">Syllabus Explorer</h2>
-          <p className="text-sm text-base-muted font-medium">Track completion and study with AI and high-yield insights.</p>
-        </div>
-        <div className="flex items-center space-x-6">
-          <div className="flex flex-col items-center space-y-1">
-            <span className="text-[10px] uppercase font-bold text-accent-blue-dark bg-accent-blue/40 px-2 py-0.5 rounded-full">Focused</span>
-          </div>
-          <div className="flex flex-col items-center space-y-1">
-            <span className="text-[10px] uppercase font-bold text-accent-green-dark bg-accent-green/40 px-2 py-0.5 rounded-full">Mastered</span>
-          </div>
-        </div>
-      </div>
+    <div className="space-y-6 pb-60">
+      {sem.subjects.map((subject, idx) => {
+        const subTopics = subject.units.flatMap(u => u.topics);
+        const progress = pct(subTopics);
+        const isOpen = openSubject === subject.id;
+        const colorHues = [
+          'from-blue-500 to-indigo-600',
+          'from-amber-400 to-orange-500',
+          'from-emerald-500 to-emerald-600',
+          'from-blue-600 to-blue-700',
+          'from-indigo-600 to-indigo-700'
+        ];
+        const hue = colorHues[idx % colorHues.length];
 
-      <Accordion type="multiple" className="space-y-6">
-        {currentSemester.subjects.map(subject => {
-          const subjectTopics = subject.units.flatMap(u => u.topics);
-          const progress = getProgress(subjectTopics);
-
-          return (
-            <AccordionItem 
-              key={subject.id} 
-              value={subject.id}
-              className="bg-white border border-base-border rounded-[2rem] shadow-sm overflow-hidden hover:shadow-md transition-shadow px-6 no-underline"
+        return (
+          <div 
+            key={subject.id} 
+            className="border border-slate-200 rounded-[2rem] bg-white shadow-premium overflow-visible transition-all duration-300"
+          >
+            {/* Subject Trigger */}
+            <button 
+              onClick={() => setOpenSubject(isOpen ? null : subject.id)}
+              className="w-full flex items-center gap-6 px-6 py-6 hover:bg-slate-50/50 transition-colors text-left rounded-[2rem] group"
             >
-              <AccordionTrigger className="hover:no-underline py-8">
-                <div className="flex items-center justify-between w-full pr-8">
-                  <div className="flex flex-col items-start space-y-1">
-                    <h3 className="text-xl font-bold tracking-tight">{subject.name}</h3>
-                    <div className="flex items-center space-x-4">
-                      <span className="text-[10px] font-bold text-base-muted uppercase tracking-wider">{subject.units.length} Units</span>
-                      <span className="text-[10px] font-bold text-base-muted uppercase tracking-wider">{subjectTopics.length} Topics</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="flex flex-col items-end space-y-1">
-                       <Progress value={progress} className="w-32 h-2.5 bg-base-surface" />
-                       <span className="text-xs font-bold text-accent-green-dark">{progress}% Complete</span>
-                    </div>
-                  </div>
+              <div className={cn('w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-lg border border-white/20 bg-gradient-to-br group-hover:scale-110 transition-transform duration-300', hue)}>
+                <BookOpen size={20} className="text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition-colors tracking-tight leading-tight">{subject.name}</h3>
+                <div className="flex items-center gap-3 mt-1 opacity-60">
+                   <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">
+                     {subject.units.length} Units · {subTopics.length} topics
+                   </span>
                 </div>
-              </AccordionTrigger>
-              <AccordionContent className="pb-8">
-                <div className="space-y-4 pt-4 border-t border-base-border">
-                  {subject.units.map(unit => {
-                    const unitProgress = getProgress(unit.topics);
+              </div>
+              <div className="flex items-center gap-4 shrink-0 px-4 py-2 bg-slate-50 border border-slate-200/50 rounded-2xl mr-2">
+                <div className="flex flex-col items-end">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Mastery</span>
+                  <span className={cn("text-xs font-bold", progress === 100 ? 'text-emerald-600' : 'text-blue-600')}>{progress}%</span>
+                </div>
+                <Progress value={progress} className="w-16 h-2 bg-slate-200" />
+              </div>
+              <ChevronDown size={18} className={cn('text-slate-300 transition-transform duration-300 mr-2', isOpen ? 'rotate-180 text-slate-600' : '')} />
+            </button>
 
-                    return (
-                      <Accordion type="single" collapsible key={unit.id}>
-                        <AccordionItem value={unit.id} className="border-none bg-base-surface/40 rounded-3xl overflow-hidden px-4">
-                          <AccordionTrigger className="hover:no-underline py-5 pr-4">
-                             <div className="flex items-center justify-between w-full">
-                               <div className="flex flex-col items-start">
-                                 <h4 className="font-bold text-base-text">{unit.name}</h4>
-                                 <span className="text-xs text-base-muted">{unit.topics.length} topics</span>
-                               </div>
-                               <div className="flex items-center space-x-6">
-                                 <Progress value={unitProgress} className="w-20 h-2 bg-white" />
-                                 <span className="text-xs font-bold text-accent-green-dark w-10">{unitProgress}%</span>
-                               </div>
-                             </div>
-                          </AccordionTrigger>
-                          <AccordionContent className="bg-white rounded-2xl mx-1 mb-3 border border-base-border/50">
-                            <div className="divide-y divide-base-border/30">
-                              {unit.topics.map(topic => (
-                                <div key={topic.id} className="flex items-center justify-between p-4 px-6 hover:bg-base-surface/30 group transition-colors first:rounded-t-2xl last:rounded-b-2xl">
-                                  <div className="flex items-center space-x-5">
-                                    <Checkbox 
-                                      id={topic.id}
-                                      checked={completedTopics.includes(topic.id)}
-                                      onCheckedChange={(checked) => toggleTopic(topic.id, !!checked)}
-                                      className="w-6 h-6 rounded-lg data-[state=checked]:bg-accent-green-mid data-[state=checked]:border-accent-green-mid"
-                                    />
-                                    <div className="flex flex-col">
-                                      <label 
+            <AnimatePresence>
+              {isOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-visible"
+                >
+                  <div className="px-6 pb-8 pt-2 space-y-4 bg-slate-50/30 rounded-b-[2rem] border-t border-slate-100">
+                    {subject.units.map(unit => {
+                      const unitPct = pct(unit.topics);
+                      const isUnitOpen = openUnit === unit.id;
+
+                      return (
+                        <div key={unit.id} className="border border-slate-200 rounded-2xl bg-white shadow-sm overflow-visible">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setOpenUnit(isUnitOpen ? null : unit.id); }}
+                            className="w-full flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors text-sm group rounded-2xl"
+                          >
+                            <Target size={17} className={cn('transition-colors duration-300', isUnitOpen ? 'text-indigo-600' : 'text-slate-400 group-hover:text-indigo-500')} />
+                            <span className="flex-1 text-left font-bold text-slate-800 tracking-tight">{unit.name}</span>
+                            <div className="flex items-center gap-3 shrink-0 mr-1">
+                              <span className={cn("text-[10px] font-bold w-10 text-right uppercase tracking-tighter", unitPct === 100 ? 'text-emerald-600' : 'text-slate-400')}>
+                                {unitPct}%
+                              </span>
+                              <Progress value={unitPct} className="w-16 h-1.5 bg-slate-100" />
+                              <ChevronDown size={14} className={cn('text-slate-400 transition-transform duration-300', isUnitOpen ? 'rotate-180 text-blue-500' : '')} />
+                            </div>
+                          </button>
+
+                          <AnimatePresence>
+                            {isUnitOpen && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                className="overflow-visible"
+                              >
+                                <div className="divide-y divide-slate-100 border-t border-slate-100 mx-2 mb-2">
+                                  {unit.topics.map(topic => (
+                                    <div
+                                      key={topic.id}
+                                      className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors group rounded-xl"
+                                    >
+                                      <div className="relative h-5 w-5 shrink-0 flex items-center justify-center">
+                                        <Checkbox
+                                          id={topic.id}
+                                          checked={completed.includes(topic.id)}
+                                          onCheckedChange={() => toggle(topic.id)}
+                                          className="h-5 w-5 border-slate-300 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 transition-all active:scale-95 shadow-sm"
+                                        />
+                                      </div>
+                                      <label
                                         htmlFor={topic.id}
-                                        className={`text-sm font-semibold transition-all cursor-pointer ${completedTopics.includes(topic.id) ? 'text-base-muted line-through opacity-60' : 'text-base-text'}`}
+                                        className={cn(
+                                          'flex-1 text-[13px] cursor-pointer select-none transition-all duration-300',
+                                          completed.includes(topic.id) ? 'line-through text-slate-400' : 'text-slate-700 font-semibold'
+                                        )}
                                       >
                                         {topic.name}
                                       </label>
-                                      {topic.isHighYield && (
-                                        <div className="flex items-center mt-0.5 space-x-1">
-                                          <Star size={10} className="text-accent-blue-dark fill-accent-blue-dark" />
-                                          <span className="text-[9px] font-bold text-accent-blue-dark uppercase tracking-widest">High Yield</span>
-                                        </div>
-                                      )}
+                                      
+                                      <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-all duration-300">
+                                        {topic.isHighYield && (
+                                          <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-orange-50 border border-orange-100/50">
+                                            <Zap size={11} className="text-orange-500 fill-orange-500" />
+                                            <span className="text-[10px] font-bold text-orange-600 uppercase tracking-widest">Yield</span>
+                                          </div>
+                                        )}
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-8 px-3 text-[11px] font-bold text-blue-600 bg-white border-slate-200 hover:bg-blue-600 hover:text-white hover:border-blue-600 rounded-lg gap-2 transition-all shadow-sm active:scale-95"
+                                        >
+                                          <Sparkles size={13} strokeWidth={2.5} />
+                                          ASK
+                                        </Button>
+                                      </div>
                                     </div>
-                                  </div>
-                                  
-                                  <Button 
-                                    size="sm"
-                                    variant="ghost"
-                                    className="bg-black text-white rounded-xl text-[10px] font-bold uppercase tracking-widest px-4 h-9 hover:bg-accent-blue-mid transition-all active:scale-95"
-                                  >
-                                    <MessageCircle size={14} className="mr-2" />
-                                    Ask AI
-                                  </Button>
+                                  ))}
                                 </div>
-                              ))}
-                            </div>
-                          </AccordionContent>
-                        </AccordionItem>
-                      </Accordion>
-                    );
-                  })}
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          );
-        })}
-      </Accordion>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      })}
     </div>
   );
 };
