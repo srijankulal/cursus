@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { mockStudents, Student } from '@/data/mockStudents';
+import { mockStudents, Student } from '@/models/mockStudents';
 import { MoreVertical, ChevronRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { 
   Table, 

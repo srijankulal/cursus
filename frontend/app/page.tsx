@@ -1,12 +1,70 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ArrowRight, Layers, Cpu, BarChart3 } from 'lucide-react';
 
+import { ROLE_HOME_ROUTES, type SessionRole } from '@/lib/auth/session';
+
+const roleLabelMap: Record<SessionRole, string> = {
+  hod: 'HOD Dashboard',
+  staff: 'Staff Portal',
+  students: 'Student Portal',
+};
+
 export default function LandingPage() {
+  const [sessionRole, setSessionRole] = useState<SessionRole | null>(null);
+  const [sessionResolved, setSessionResolved] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadSession = async () => {
+      try {
+        const response = await fetch('/api/auth/session', { method: 'GET' });
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (mounted) {
+          setSessionRole((data.role as SessionRole | null) ?? null);
+        }
+      } catch {
+        if (mounted) {
+          setSessionRole(null);
+        }
+      } finally {
+        if (mounted) {
+          setSessionResolved(true);
+        }
+      }
+    };
+
+    loadSession();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const primaryRole = useMemo(() => sessionRole ?? 'students', [sessionRole]);
+
+  const portalLink = ROLE_HOME_ROUTES[primaryRole];
+  const portalLabel = roleLabelMap[primaryRole];
+
+  const showPublicCtas = sessionResolved && !sessionRole;
+
+  async function handleLogout() {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } finally {
+      setSessionRole(null);
+      window.location.reload();
+    }
+  }
+
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* Nav */}
@@ -18,12 +76,33 @@ export default function LandingPage() {
           <span className="font-semibold text-app-text text-base tracking-tight">Cursus</span>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/student">
-            <Button variant="ghost" size="sm" className="text-app-muted font-medium">Student</Button>
-          </Link>
-          <Link href="/hod">
-            <Button size="sm" className="bg-black text-white hover:bg-neutral-800 rounded-lg font-medium">HOD Dashboard</Button>
-          </Link>
+          {!sessionResolved ? null : sessionRole ? (
+            <>
+              <Link href={portalLink}>
+                <Button size="sm" className="bg-black text-white hover:bg-neutral-800 rounded-lg font-medium">{portalLabel}</Button>
+              </Link>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-app-muted font-medium"
+                onClick={handleLogout}
+              >
+                Logout
+              </Button>
+            </>
+          ) : (
+            <>
+              <Link href="/auth">
+                <Button variant="ghost" size="sm" className="text-app-muted font-medium">Login / Sign up</Button>
+              </Link>
+              <Link href="/student">
+                <Button variant="ghost" size="sm" className="text-app-muted font-medium">Student</Button>
+              </Link>
+              <Link href="/hod">
+                <Button size="sm" className="bg-black text-white hover:bg-neutral-800 rounded-lg font-medium">HOD Dashboard</Button>
+              </Link>
+            </>
+          )}
         </div>
       </header>
 
@@ -51,16 +130,18 @@ export default function LandingPage() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-            <Link href="/student">
+            <Link href={portalLink}>
               <Button className="h-11 px-8 bg-black text-white hover:bg-neutral-800 rounded-xl font-medium gap-2">
-                Student Portal <ArrowRight size={16} />
+                {portalLabel} <ArrowRight size={16} />
               </Button>
             </Link>
-            <Link href="/hod">
-              <Button variant="outline" className="h-11 px-8 rounded-xl font-medium border-app-border text-app-text hover:bg-neutral-50">
-                HOD Dashboard
-              </Button>
-            </Link>
+            {showPublicCtas && (
+              <Link href="/hod">
+                <Button variant="outline" className="h-11 px-8 rounded-xl font-medium border-app-border text-app-text hover:bg-neutral-50">
+                  HOD Dashboard
+                </Button>
+              </Link>
+            )}
           </div>
         </motion.div>
 
