@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { hash } from 'bcryptjs';
 
+import { connectToDatabase } from '@/lib/mongoose';
+import User from '@/models/user';
 import {
-  ensureUserIndexes,
-  getUsersCollection,
+  normalizeEmail,
   validateSignupInput,
 } from '@/lib/auth/users';
 
@@ -16,19 +17,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, message: validation.message }, { status: 400 });
     }
 
-    await ensureUserIndexes();
+    await connectToDatabase();
 
     const { name, email, password, role } = validation.data;
-    const users = await getUsersCollection();
     const passwordHash = await hash(password, 12);
 
-    const result = await users.insertOne({
+    const createdUser = await User.create({
       name,
-      email,
+      email: normalizeEmail(email),
       role,
       passwordHash,
-      createdAt: new Date(),
-      updatedAt: new Date(),
     });
 
     return NextResponse.json(
@@ -36,10 +34,10 @@ export async function POST(request: Request) {
         ok: true,
         message: 'Account created successfully.',
         user: {
-          id: result.insertedId.toString(),
-          name,
-          email,
-          role,
+          id: createdUser._id.toString(),
+          name: createdUser.name,
+          email: createdUser.email,
+          role: createdUser.role,
         },
       },
       { status: 201 }

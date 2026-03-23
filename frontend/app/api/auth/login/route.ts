@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { compare } from 'bcryptjs';
 
+import { connectToDatabase } from '@/lib/mongoose';
+import User from '@/models/user';
 import { SESSION_COOKIE_NAME } from '@/lib/auth/session';
 import {
-  findUserByEmailAndRole,
+  normalizeEmail,
   validateLoginInput,
 } from '@/lib/auth/users';
 
@@ -17,7 +19,8 @@ export async function POST(request: Request) {
     }
 
     const { email, password, role } = validation.data;
-    const user = await findUserByEmailAndRole(email, role);
+    await connectToDatabase();
+    const user = await User.findOne({ email: normalizeEmail(email), role }).exec();
 
     if (!user) {
       return NextResponse.json({ ok: false, message: 'Invalid credentials.' }, { status: 401 });
