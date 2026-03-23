@@ -6,6 +6,7 @@ import { StatsRow } from '@/components/hod/StatsRow';
 import { SubjectChart } from '@/components/hod/SubjectChart';
 import { AtRiskTable } from '@/components/hod/AtRiskTable';
 import { ProgressChart } from '@/components/hod/ProgressChart';
+import { ClassManagement } from '@/components/hod/ClassManagement';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, LayoutDashboard, Users, GraduationCap, BarChart3, Settings } from 'lucide-react';
@@ -14,6 +15,7 @@ import Link from 'next/link';
 
 const tabs = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { id: 'classes', label: 'Classes', icon: GraduationCap },  
   { id: 'students', label: 'Student Directory', icon: Users },
   { id: 'subjects', label: 'Syllabus Coverage', icon: BarChart3 },
 ];
@@ -150,6 +152,10 @@ export default function HODPage() {
                         <p className="text-sm text-slate-400 mt-2 font-medium">Review subject-wise coverage bottlenecks and faculty feedback for current semester units.</p>
                        </div>
                     </div>
+                  )}
+
+                  {tab === 'classes' && (
+                      <ClassManagement />
                   )}
                 </motion.div>
               </AnimatePresence>
