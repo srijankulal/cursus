@@ -109,8 +109,8 @@ export default function LandingPage() {
       {/* Hero */}
       <main className="flex-1 flex flex-col items-center justify-center px-6 pt-40 pb-24 text-center max-w-5xl mx-auto w-full relative">
         {/* Background Gradients */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[600px] bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-50/50 via-transparent to-transparent -z-10" />
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-violet-50/40 via-transparent to-transparent -z-10 blur-3xl opacity-60" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-150 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-50/50 via-transparent to-transparent -z-10" />
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 w-200 h-100 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-violet-50/40 via-transparent to-transparent -z-10 blur-3xl opacity-60" />
 
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -161,7 +161,7 @@ export default function LandingPage() {
             { icon: Cpu, title: 'AI Study Plan', desc: 'Gemini-powered dynamic schedules tailored to your learning pace.', color: 'violet' },
             { icon: BarChart3, title: 'Risk Insights', desc: 'Advanced analytics to identify potential bottlenecks before they occur.', color: 'amber' },
           ].map((f, i) => (
-            <Card key={i} className="group relative overflow-hidden text-left p-8 border border-neutral-200/60 rounded-[2rem] shadow-none bg-white/80 backdrop-blur-sm hover:bg-white hover:border-neutral-300 hover:shadow-2xl hover:shadow-black/[0.03] transition-all duration-500">
+            <Card key={i} className="group relative overflow-hidden text-left p-8 border border-neutral-200/60 rounded-4xl shadow-none bg-white/80 backdrop-blur-sm hover:bg-white hover:border-neutral-300 hover:shadow-2xl hover:shadow-black/[0.03] transition-all duration-500">
               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-6 transition-transform group-hover:scale-110 duration-500 ${
                 f.color === 'blue' ? 'bg-blue-50 text-blue-600' : 
                 f.color === 'violet' ? 'bg-violet-50 text-violet-600' : 

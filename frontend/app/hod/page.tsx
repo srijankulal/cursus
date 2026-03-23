@@ -23,18 +23,40 @@ const tabs = [
 export default function HODPage() {
   const [tab, setTab] = useState('overview');
   const [batch, setBatch] = useState('BCA 2023');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-app-bg text-app-text overflow-hidden font-sans">
+    <div className="flex h-screen bg-app-bg text-app-text overflow-hidden font-sans relative">
       {/* Sidebar - Matching student style but distinct color */}
-      <aside className="w-64 bg-slate-900 flex flex-col h-full shrink-0 shadow-2xl relative z-20">
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 lg:hidden"
+          />
+        )}
+      </AnimatePresence>
+
+      <aside className={cn(
+        "fixed lg:relative w-64 bg-slate-900 flex flex-col h-full shrink-0 shadow-2xl z-50 transition-transform duration-300",
+        isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+      )}>
         <div className="h-[72px] flex items-center px-6 border-b border-white/5 gap-3">
           <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center shrink-0 shadow-lg">
              <span className="text-slate-900 text-sm font-bold">H</span>
           </div>
-          <motion.span className="font-bold text-sm text-white tracking-tight uppercase">
+          <motion.span className="font-bold text-sm text-white tracking-tight uppercase flex-1">
             HOD PORTAL
           </motion.span>
+          <button 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="lg:hidden text-slate-400 p-2"
+          >
+            <ArrowLeft size={20} />
+          </button>
         </div>
 
         <nav className="flex-1 py-8 px-4 space-y-2">
@@ -43,7 +65,10 @@ export default function HODPage() {
             return (
               <button
                 key={t.id}
-                onClick={() => setTab(t.id)}
+                onClick={() => {
+                  setTab(t.id);
+                  setIsMobileMenuOpen(false);
+                }}
                 className={cn(
                   'w-full flex items-center px-4 h-12 rounded-xl transition-all duration-300 gap-4 group relative',
                   isActive 
@@ -76,14 +101,22 @@ export default function HODPage() {
         {/* Modern floating workspace container */}
         <div className="flex-1 m-4 sm:m-6 bg-white rounded-3xl border border-app-border shadow-premium overflow-hidden flex flex-col">
           
-          <header className="px-8 py-6 border-b border-app-border shrink-0 flex items-center justify-between bg-white relative z-10">
-            <div>
-              <h1 className="text-xl font-bold tracking-tight text-slate-900 capitalize">{tab} Dashboard</h1>
-              <p className="text-[13px] text-app-muted mt-1">HOD Overview for {batch} academic batch.</p>
+          <header className="px-4 sm:px-8 py-4 sm:py-6 border-b border-app-border shrink-0 flex items-center justify-between bg-white relative z-10">
+            <div className="flex items-center gap-3 min-w-0">
+              <button 
+                onClick={() => setIsMobileMenuOpen(true)}
+                className="lg:hidden p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <LayoutDashboard size={20} />
+              </button>
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 capitalize truncate">{tab} Dashboard</h1>
+                <p className="hidden sm:block text-[13px] text-app-muted mt-1 truncate">HOD Overview for {batch} academic batch.</p>
+              </div>
             </div>
 
-            <div className="flex items-center gap-4">
-              <div className="flex -space-x-2 mr-4">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <div className="hidden md:flex -space-x-2 mr-4">
                 {[1,2,3,4].map(i => (
                   <div key={i} className="w-8 h-8 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400">
                     {i}
@@ -91,7 +124,7 @@ export default function HODPage() {
                 ))}
               </div>
               <Select value={batch} onValueChange={setBatch}>
-                <SelectTrigger className="w-32 h-10 border-slate-200 bg-slate-50 rounded-xl text-[11px] font-bold uppercase tracking-widest shadow-sm">
+                <SelectTrigger className="w-24 sm:w-32 h-9 sm:h-10 border-slate-200 bg-slate-50 rounded-xl text-[10px] sm:text-[11px] font-bold uppercase tracking-widest shadow-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl shadow-xl">
