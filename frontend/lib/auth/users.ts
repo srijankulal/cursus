@@ -1,22 +1,8 @@
 import 'server-only';
 
-import { ObjectId } from 'mongodb';
-
-import { getDb } from '@/lib/mongodb';
-
 export const USER_ROLES = ['hod', 'staff', 'students'] as const;
 
 export type UserRole = (typeof USER_ROLES)[number];
-
-export interface UserDocument {
-  _id: ObjectId;
-  name: string;
-  email: string;
-  role: UserRole;
-  passwordHash: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
 
 interface SignupInput {
   name: string;
@@ -31,9 +17,7 @@ interface LoginInput {
   role: string;
 }
 
-let ensureIndexesPromise: Promise<void> | null = null;
-
-function normalizeEmail(value: string) {
+export function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
@@ -89,25 +73,4 @@ export function validateLoginInput(input: LoginInput) {
       role,
     },
   };
-}
-
-export async function getUsersCollection() {
-  const db = await getDb();
-  return db.collection<UserDocument>('users');
-}
-
-export async function ensureUserIndexes() {
-  if (!ensureIndexesPromise) {
-    ensureIndexesPromise = (async () => {
-      const users = await getUsersCollection();
-      await users.createIndex({ email: 1, role: 1 }, { unique: true, name: 'email_role_unique' });
-    })();
-  }
-
-  await ensureIndexesPromise;
-}
-
-export async function findUserByEmailAndRole(email: string, role: UserRole) {
-  const users = await getUsersCollection();
-  return users.findOne({ email: normalizeEmail(email), role });
 }
