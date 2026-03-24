@@ -5,6 +5,7 @@ import { Home, BookOpen, Calendar, MessageSquare, PanelLeftClose, PanelLeftOpen,
 import { Progress } from '@/components/ui/progress';  
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 interface SidebarProps {
   activeTab: string;
@@ -25,9 +26,17 @@ const tabs = [
   { id: 'ask-ai',     label: 'Ask AI',      icon: MessageSquare, hue: 'hover:text-indigo-500 hover:bg-indigo-50/50', active: 'bg-indigo-600 text-white shadow-indigo-500/20 shadow-lg' },
 ];
 
+const routeLinks = [
+  { id: 'rag', label: 'RAG', href: '/rag', icon: Sparkles, hue: 'hover:text-violet-500 hover:bg-violet-50/50' },
+  { id: 'question-papers', label: 'Question Papers', href: '/question-papers', icon: FileText, hue: 'hover:text-sky-500 hover:bg-sky-50/50' },
+];
+
 export const Sidebar = ({
   activeTab, setActiveTab, semesterName, progress, collapsed, setCollapsed, isMobileOpen, setIsMobileOpen
-}: SidebarProps) => (
+}: SidebarProps) => {
+  const pathname = usePathname();
+
+  return (
   <>
     {/* Mobile Overlay */}
     <AnimatePresence>
@@ -133,6 +142,36 @@ export const Sidebar = ({
           );
         })}
 
+        <div className="pt-4 mt-4 border-t border-slate-200/60 space-y-2">
+          {routeLinks.map((link) => {
+            const isRouteActive = pathname === link.href;
+            return (
+              <Link
+                key={link.id}
+                href={link.href}
+                onClick={() => setIsMobileOpen?.(false)}
+                className={cn(
+                  'group w-full flex items-center rounded-xl transition-all duration-300 h-11 relative',
+                  collapsed ? 'justify-center px-0' : 'px-4 gap-4',
+                  isRouteActive
+                    ? 'bg-slate-900 text-white shadow-slate-900/20 shadow-lg'
+                    : cn('text-slate-400 bg-transparent hover:font-bold', link.hue)
+                )}
+              >
+                <link.icon size={19} className={cn('shrink-0 transition-transform duration-300', isRouteActive ? 'text-white' : 'group-hover:scale-110')} />
+                {!collapsed && (
+                  <span className="text-[13px] font-black tracking-widest whitespace-nowrap overflow-hidden uppercase">
+                    {link.label}
+                  </span>
+                )}
+                {collapsed && isRouteActive && (
+                  <div className="absolute inset-0 rounded-xl bg-slate-900/5 ring-2 ring-slate-200/50" />
+                )}
+              </Link>
+            );
+          })}
+        </div>
+
         {/* Collapsed expand icon at bottom of nav */}
         {collapsed && (
           <div className="pt-4 border-t border-slate-200/60 mt-4 px-1">
@@ -184,4 +223,5 @@ export const Sidebar = ({
     </div>
   </motion.aside>
   </>
-);
+  );
+};
