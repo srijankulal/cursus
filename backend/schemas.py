@@ -34,6 +34,7 @@ class QueryRequest(BaseModel):
     document_id: str | None = None
     subject: str | None = None
     tags: list[str] = Field(default_factory=list)
+    style: Literal["brief", "detailed", "bullets"] = "brief"
 
 
 class QueryHit(BaseModel):
@@ -46,3 +47,8 @@ class QueryHit(BaseModel):
 class QueryResponse(BaseModel):
     matches: list[QueryHit]
     used_namespaces: list[str]
+
+
+class QueryCleanResponse(BaseModel):
+    answer: str
+    used_gemini_fallback: bool | None = None
