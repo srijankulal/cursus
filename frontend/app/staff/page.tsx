@@ -4,14 +4,20 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, LayoutDashboard, BookOpen, Users, ClipboardCheck, Settings, Bell, Calendar } from 'lucide-react';
+import { ArrowLeft, LayoutDashboard, BookOpen, Users, ClipboardCheck, Settings, Bell, Calendar, Upload } from 'lucide-react';
+import { UploadManager } from '@/components/hod/UploadManager';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
 const tabs = [
   { id: 'dashboard', label: 'My Subjects', icon: BookOpen },
   { id: 'attendance', label: 'Attendance', icon: ClipboardCheck },
+<<<<<<< Updated upstream
   { id: 'students', label: 'Student Progress', icon: Users },
+=======
+  { id: 'students', label: 'Manage Students', icon: Users },
+  { id: 'uploads', label: 'Upload Notes/Docs', icon: Upload },
+>>>>>>> Stashed changes
 ];
 
 export default function StaffPage() {
@@ -169,13 +175,107 @@ export default function StaffPage() {
                   )}
 
                   {tab === 'students' && (
+<<<<<<< Updated upstream
                     <div className="p-20 text-center space-y-6 rounded-[2rem] border-2 border-dashed border-indigo-100 bg-indigo-50/20">
                        <Users size={64} className="mx-auto text-indigo-200" />
                        <div className="max-w-xs mx-auto">
                         <h3 className="text-lg font-bold text-slate-800">Student Progress View</h3>
                         <p className="text-sm text-slate-500 mt-2 font-medium">See how many students have marked specific units as done and identify high-yield confusion points.</p>
                        </div>
+=======
+                    <div className="space-y-6 rounded-4xl border border-indigo-100 bg-white p-8 shadow-sm">
+                      <h3 className="text-lg font-bold text-slate-900">Class Guide Student Management</h3>
+
+                      {manageableClasses.length === 0 ? (
+                        <p className="text-sm text-slate-500">You are not class guide for any class yet.</p>
+                      ) : (
+                        <>
+                          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                            <div className="md:col-span-2">
+                              <Select value={selectedClassId} onValueChange={setSelectedClassId}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select class" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {manageableClasses.map((item) => (
+                                    <SelectItem key={item._id} value={item._id}>
+                                      {item.name} - Sem {item.semester}
+                                    </SelectItem>
+                                  ))}
+
+                            
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <Select
+                                value={selectedCandidateRoll}
+                                onValueChange={(value) => {
+                                  setSelectedCandidateRoll(value);
+                                  setNewRollNumber(value);
+                                }}
+                              >
+                                
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Pick student" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {candidateStudents.map((candidate) => (
+                                    <SelectItem key={candidate._id} value={candidate.rollNumber}>
+                                      {candidate.rollNumber} - {candidate.name}
+                                      {candidate.inSelectedClass ? ' (Already in class)' : ''}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                            <div className="md:col-span-2">
+                              <Input
+                                value={newRollNumber}
+                                onChange={(event) => setNewRollNumber(event.target.value)}
+                                placeholder="Roll number"
+                              />
+                            </div>
+                            <Button onClick={handleAddStudent} disabled={isSubmitting}>
+                              Add Student
+                            </Button>
+                          </div>
+
+                          {feedback && (
+                            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                              {feedback}
+                            </div>
+                          )}
+                          
+              
+
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50/40 p-4">
+                            <h4 className="text-sm font-bold text-slate-800 mb-3">Students in selected class</h4>
+                            {selectedClass && selectedClass.students.length > 0 ? (
+                              <div className="space-y-2">
+                                {selectedClass.students.map((student) => (
+                                  <div key={student._id} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm">
+                                    <span className="font-medium text-slate-800">{student.rollNumber}</span>
+                                    <span className="text-xs text-slate-500">Semester {student.semester}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-slate-500">No students added yet.</p>
+                            )}
+                          </div>
+                        </>
+                      )}
+>>>>>>> Stashed changes
                     </div>
+                  )}
+
+                  {tab === 'uploads' && (
+                      <UploadManager staffMode={true} />
                   )}
                 </motion.div>
               </AnimatePresence>

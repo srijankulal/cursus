@@ -8,14 +8,18 @@ import { AtRiskTable } from '@/components/hod/AtRiskTable';
 import { ProgressChart } from '@/components/hod/ProgressChart';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, LayoutDashboard, Users, GraduationCap, BarChart3, Settings } from 'lucide-react';
+import { ArrowLeft, LayoutDashboard, Users, GraduationCap, BarChart3, Settings, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SyllabusManager } from '@/components/hod/SyllabusManager';
+import { UploadManager } from '@/components/hod/UploadManager';
 import Link from 'next/link';
 
 const tabs = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'students', label: 'Student Directory', icon: Users },
   { id: 'subjects', label: 'Syllabus Coverage', icon: BarChart3 },
+  { id: 'syllabus-config', label: 'Config Syllabus', icon: Settings },
+  { id: 'uploads', label: 'Uploads', icon: Upload },
 ];
 
 export default function HODPage() {
@@ -183,6 +187,18 @@ export default function HODPage() {
                         <p className="text-sm text-slate-400 mt-2 font-medium">Review subject-wise coverage bottlenecks and faculty feedback for current semester units.</p>
                        </div>
                     </div>
+                  )}
+
+                  {tab === 'classes' && (
+                      <ClassManagement />
+                  )}
+
+                  {tab === 'syllabus-config' && (
+                      <SyllabusManager />
+                  )}
+
+                  {tab === 'uploads' && (
+                      <UploadManager />
                   )}
                 </motion.div>
               </AnimatePresence>
