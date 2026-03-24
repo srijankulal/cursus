@@ -3,8 +3,8 @@ services:
     name: cursus-backend
     runtime: python
     plan: free
-    rootDir: backend
-    buildCommand: pip install -r requirements.txt
+    rootDir: .
+    buildCommand: pip install -r backend/requirements.txt
     startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     autoDeploy: true
