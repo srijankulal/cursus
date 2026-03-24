@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -38,6 +38,11 @@ export default function AuthPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<Role>('students');
+  const [semester, setSemester] = useState('1');
+  const [rollNumber, setRollNumber] = useState('');
+  const [classId, setClassId] = useState('');
+  const [availableClasses, setAvailableClasses] = useState<Array<{ _id: string; name: string }>>([]);
+  const [isLoadingClasses, setIsLoadingClasses] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [feedbackType, setFeedbackType] = useState<'success' | 'error' | null>(null);
@@ -52,6 +57,52 @@ export default function AuthPage() {
     return `${prefix} ${roleOptions.find((option) => option.value === role)?.label}. ${roleDescription[role]}`;
   }, [mode, role]);
 
+  useEffect(() => {
+    async function loadClasses() {
+      if (mode !== 'signup' || role !== 'students') {
+        setAvailableClasses([]);
+        setClassId('');
+        return;
+      }
+
+      setIsLoadingClasses(true);
+
+      try {
+        const response = await fetch(`/api/auth/signup/classes?semester=${encodeURIComponent(semester)}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          setAvailableClasses([]);
+          setClassId('');
+          return;
+        }
+
+        const classes = Array.isArray(data.classes)
+          ? (data.classes as Array<{ _id: string; name: string }>)
+          : [];
+
+        setAvailableClasses(classes);
+
+        if (classes.length === 0) {
+          setClassId('');
+          return;
+        }
+
+        const hasSelectedClass = classes.some((classItem) => classItem._id === classId);
+        if (!hasSelectedClass) {
+          setClassId(classes[0]._id);
+        }
+      } catch {
+        setAvailableClasses([]);
+        setClassId('');
+      } finally {
+        setIsLoadingClasses(false);
+      }
+    }
+
+    void loadClasses();
+  }, [mode, role, semester, classId]);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSubmitting(true);
@@ -63,7 +114,15 @@ export default function AuthPage() {
       const payload =
         mode === 'login'
           ? { email, password, role }
-          : { name, email, password, role };
+          : {
+              name,
+              email,
+              password,
+              role,
+              semester: role === 'students' ? Number(semester) : undefined,
+              rollNumber: role === 'students' ? rollNumber : undefined,
+              classId: role === 'students' ? classId || undefined : undefined,
+            };
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -84,6 +143,8 @@ export default function AuthPage() {
       if (mode === 'signup') {
         setFeedback('Account created. You can now log in.');
         setFeedbackType('success');
+        setRollNumber('');
+        setClassId('');
         setMode('login');
         return;
       }
@@ -92,6 +153,10 @@ export default function AuthPage() {
       setFeedback('Login successful. Redirecting...');
 
       const userRole = (data.user?.role as Role | undefined) ?? role;
+      const userId = data.user?.id as string | undefined;
+      if (userId) {
+        localStorage.setItem('userId', userId);
+      }
       router.push(roleRouteMap[userRole]);
     } catch {
       setFeedback('Something went wrong. Please try again.');
@@ -184,6 +249,68 @@ export default function AuthPage() {
                     required
                   />
                 </div>
+              )}
+
+              {mode === 'signup' && role === 'students' && (
+                <>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-app-text" htmlFor="semester">
+                      Semester
+                    </label>
+                    <select
+                      id="semester"
+                      value={semester}
+                      onChange={(event) => setSemester(event.target.value)}
+                      className="h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs"
+                      required
+                    >
+                      {[1, 2, 3, 4, 5, 6].map((value) => (
+                        <option key={value} value={String(value)}>
+                          Semester {value}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-app-text" htmlFor="rollNumber">
+                      Roll number
+                    </label>
+                    <Input
+                      id="rollNumber"
+                      value={rollNumber}
+                      onChange={(event) => setRollNumber(event.target.value.toUpperCase())}
+                      placeholder="BCA24-001"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-app-text" htmlFor="classId">
+                      Class
+                    </label>
+                    <select
+                      id="classId"
+                      value={classId}
+                      onChange={(event) => setClassId(event.target.value)}
+                      className="h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs"
+                      disabled={isLoadingClasses || availableClasses.length === 0}
+                    >
+                      {availableClasses.length === 0 ? (
+                        <option value="">{isLoadingClasses ? 'Loading classes...' : 'No class available'}</option>
+                      ) : (
+                        availableClasses.map((classItem) => (
+                          <option key={classItem._id} value={classItem._id}>
+                            {classItem.name}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                    <p className="text-xs text-app-muted">
+                      Selecting a class is optional during signup.
+                    </p>
+                  </div>
+                </>
               )}
 
               <div className="space-y-1.5">

@@ -1,4 +1,5 @@
 export const SESSION_COOKIE_NAME = 'cursus_session_role';
+export const SESSION_USER_ID_COOKIE_NAME = 'cursus_session_user_id';
 
 export const ROLE_HOME_ROUTES = {
   hod: '/hod',

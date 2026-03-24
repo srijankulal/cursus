@@ -12,6 +12,7 @@ class AppState:
     settings: Settings
     mongo_client: MongoClient
     mongo_collection: Any
+    mongo_questions_collection: Any
     pinecone_client: Pinecone
     pinecone_index: Any
 
@@ -23,6 +24,9 @@ async def lifespan(app: FastAPI):
     state.mongo_client = MongoClient(state.settings.mongodb_uri)
     state.mongo_collection = state.mongo_client[state.settings.mongodb_db_name][
         state.settings.mongodb_documents_collection
+    ]
+    state.mongo_questions_collection = state.mongo_client[state.settings.mongodb_db_name][
+        state.settings.mongodb_questions_collection
     ]
 
     state.pinecone_client = Pinecone(api_key=state.settings.pinecone_api_key)

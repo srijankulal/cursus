@@ -26,11 +26,26 @@ export async function GET(request: Request) {
     const faculties = await Faculty.find({ 
       department: hod.department,
       isActive: true 
-    }).select('name email').exec();
+    })
+      .populate('user', 'name email')
+      .select('_id user name email')
+      .lean()
+      .exec();
+
+    const normalizedFaculties = faculties.map((faculty) => {
+      const user = faculty.user as { name?: string; email?: string } | null;
+      const legacyFaculty = faculty as unknown as { name?: string; email?: string };
+
+      return {
+        _id: faculty._id.toString(),
+        name: user?.name ?? legacyFaculty.name ?? 'Unknown Faculty',
+        email: user?.email ?? legacyFaculty.email ?? '',
+      };
+    });
 
     return NextResponse.json({
       ok: true,
-      faculties,
+      faculties: normalizedFaculties,
     });
   } catch (error) {
     console.error('Error fetching faculties:', error);

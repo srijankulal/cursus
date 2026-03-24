@@ -12,6 +12,7 @@ class Settings(BaseModel):
     mongodb_uri: str
     mongodb_db_name: str = "cursus"
     mongodb_documents_collection: str = "rag_documents"
+    mongodb_questions_collection: str = "rag_qpaper_questions"
 
     pinecone_api_key: str
     pinecone_index_name: str
@@ -26,6 +27,7 @@ class Settings(BaseModel):
     chunk_size: int = 1200
     chunk_overlap: int = 200
     request_timeout_seconds: int = 45
+    clean_query_min_score: float = 0.2
 
 
 def get_required_env(name: str) -> str:
@@ -42,6 +44,9 @@ def load_settings() -> Settings:
         mongodb_documents_collection=os.getenv(
             "MONGODB_DOCUMENTS_COLLECTION", "rag_documents"
         ),
+        mongodb_questions_collection=os.getenv(
+            "MONGODB_QUESTIONS_COLLECTION", "rag_qpaper_questions"
+        ),
         pinecone_api_key=get_required_env("PINECONE_API_KEY"),
         pinecone_index_name=get_required_env("PINECONE_INDEX_NAME"),
         pinecone_embedding_model=os.getenv(
@@ -55,4 +60,5 @@ def load_settings() -> Settings:
         chunk_size=int(os.getenv("CHUNK_SIZE", "1200")),
         chunk_overlap=int(os.getenv("CHUNK_OVERLAP", "200")),
         request_timeout_seconds=int(os.getenv("REQUEST_TIMEOUT_SECONDS", "45")),
+        clean_query_min_score=float(os.getenv("CLEAN_QUERY_MIN_SCORE", "0.2")),
     )

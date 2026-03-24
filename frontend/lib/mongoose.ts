@@ -2,10 +2,15 @@ import 'server-only';
 
 import mongoose from 'mongoose';
 
-const { MONGODB_URI } = process.env;
+const mongoUri = process.env.MONGODB_URI;
+const mongoDbName = process.env.MONGODB_DB_NAME;
 
-if (!MONGODB_URI) {
+if (!mongoUri) {
   throw new Error('Please define MONGODB_URI in your environment variables.');
+}
+
+if (!mongoDbName) {
+  throw new Error('Please define MONGODB_DB_NAME in your environment variables.');
 }
 
 type MongooseCache = {
@@ -32,8 +37,9 @@ export async function connectToDatabase() {
   }
 
   if (!cached.promise) {
-    cached.promise = mongoose.connect(MONGODB_URI, {
+    cached.promise = mongoose.connect(mongoUri!, {
       bufferCommands: false,
+      dbName: mongoDbName!,
     });
   }
 
