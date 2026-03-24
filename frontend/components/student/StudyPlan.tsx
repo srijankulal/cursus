@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { generateStudyPlan, StudyPlanItem } from '@/lib/gemini';
-import { syllabus } from '@/data/syllabus';
+import { syllabus } from '@/models/syllabus';
 import { storage } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';

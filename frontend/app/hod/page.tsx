@@ -90,7 +90,7 @@ export default function HODPage() {
           <Link href="/">
             <Button variant="ghost" className="w-full justify-start text-slate-400 hover:text-white gap-3 rounded-xl px-4 py-6">
               <ArrowLeft size={16} />
-              <span className="text-xs font-bold uppercase tracking-widest">Logout</span>
+              <span className="text-xs font-bold uppercase tracking-widest">Exit</span>
             </Button>
           </Link>
         </div>

@@ -8,9 +8,9 @@ export interface IStudent extends Document {
   phone?: string;
   semester: number;
   rollNumber: string;
-  aiPlanAvailable: boolean;
-  riskLevel: RiskLevel;
-  examDate?: Date;
+  // aiPlanAvailable: boolean;
+  // riskLevel: RiskLevel;
+  // examDate?: Date;
   profileImage?: string;
   isActive: boolean;
   class?: Types.ObjectId;  // Reference to Class

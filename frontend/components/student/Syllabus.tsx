@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { syllabus, Topic } from '@/data/syllabus';
+import { syllabus, Topic } from '@/models/syllabus';
 import { storage } from '@/lib/storage';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
