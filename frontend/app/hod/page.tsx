@@ -7,209 +7,420 @@ import { SubjectChart } from '@/components/hod/SubjectChart';
 import { AtRiskTable } from '@/components/hod/AtRiskTable';
 import { ProgressChart } from '@/components/hod/ProgressChart';
 import { ClassManagement } from '@/components/hod/ClassManagement';
-import { Button } from '@/components/ui/button';
+import { SyllabusManager } from '@/components/hod/SyllabusManager';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, LayoutDashboard, Users, GraduationCap, BarChart3, Settings } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { SyllabusManager } from '@/components/hod/SyllabusManager';
 import Link from 'next/link';
 
+/* ─────────────────────────────────────────────
+   Design tokens — matches landing page system
+   Base bg:    #F5F4F0  (warm off-white)
+   Text:       #1A1916  (near-black)
+   Card:       #FDFCF9  border #E8E6E0
+   HOD accent: #5A7AB5  bg #E4ECFB
+───────────────────────────────────────────── */
+
 const tabs = [
-  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { id: 'classes', label: 'Classes', icon: GraduationCap },  
-  { id: 'students', label: 'Student Directory', icon: Users },
-  { id: 'subjects', label: 'Syllabus Coverage', icon: BarChart3 },
-  { id: 'syllabus-config', label: 'Config Syllabus', icon: Settings },
+  { id: 'overview',        label: 'Overview',          icon: LayoutDashboard },
+  { id: 'classes',         label: 'Classes',           icon: GraduationCap  },
+  { id: 'students',        label: 'Student Directory', icon: Users          },
+  { id: 'subjects',        label: 'Syllabus Coverage', icon: BarChart3      },
+  { id: 'syllabus-config', label: 'Config Syllabus',   icon: Settings       },
 ];
 
 export default function HODPage() {
-  const [tab, setTab] = useState('overview');
-  const [batch, setBatch] = useState('BCA 2023');
+  const [tab,             setTab]             = useState('overview');
+  const [batch,           setBatch]           = useState('BCA 2023');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-app-bg text-app-text overflow-hidden font-sans relative">
-      {/* Sidebar - Matching student style but distinct color */}
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', backgroundColor: '#F5F4F0', fontFamily: "'DM Sans', sans-serif", color: '#1A1916' }}>
+
+      {/* ── Google Fonts ── */}
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,700;0,9..40,800&family=DM+Serif+Display:ital@0;1&display=swap');
+
+        * { box-sizing: border-box; }
+
+        .hod-sidebar-link {
+          display: flex; align-items: center; gap: 12px;
+          padding: 0 16px; height: 44px;
+          border-radius: 12px;
+          font-size: 11px; font-weight: 700;
+          letter-spacing: 0.08em; text-transform: uppercase;
+          cursor: pointer; border: none; width: 100%; text-align: left;
+          transition: background 0.18s, color 0.18s;
+          position: relative;
+          font-family: 'DM Sans', sans-serif;
+          text-decoration: none;
+        }
+        .hod-sidebar-link.inactive {
+          background: transparent; color: #9E9B94;
+        }
+        .hod-sidebar-link.inactive:hover {
+          background: rgba(90,122,181,0.08); color: #5A7AB5;
+        }
+        .hod-sidebar-link.active {
+          background: #E4ECFB; color: #5A7AB5;
+          border: 1px solid #C8D8F0;
+        }
+
+        .hod-card {
+          background: #FDFCF9;
+          border: 1.5px solid #E8E6E0;
+          border-radius: 20px;
+        }
+
+        .hod-tag {
+          display: inline-flex; align-items: center; gap: 6px;
+          padding: 4px 12px; border-radius: 100px;
+          font-size: 10px; font-weight: 700;
+          letter-spacing: 0.12em; text-transform: uppercase;
+        }
+
+        .hod-btn-ghost {
+          display: inline-flex; align-items: center; gap: 8px;
+          background: transparent; color: #6B6860;
+          border-radius: 10px; font-family: 'DM Sans', sans-serif;
+          font-weight: 600; font-size: 12px; padding: 8px 16px;
+          border: 1.5px solid #E8E6E0;
+          transition: border-color 0.2s, color 0.2s, background 0.2s;
+          cursor: pointer; text-decoration: none; white-space: nowrap;
+        }
+        .hod-btn-ghost:hover { border-color: #C8C6BF; color: #1A1916; background: #FDFCF9; }
+
+        .dot-grid-hod {
+          background-image: radial-gradient(circle, #D0CEC8 1px, transparent 1px);
+          background-size: 28px 28px;
+        }
+
+        .hod-scrollarea::-webkit-scrollbar { width: 4px; }
+        .hod-scrollarea::-webkit-scrollbar-track { background: transparent; }
+        .hod-scrollarea::-webkit-scrollbar-thumb { background: #E8E6E0; border-radius: 99px; }
+        .hod-scrollarea::-webkit-scrollbar-thumb:hover { background: #C8C6BF; }
+
+        /* Mobile overlay */
+        .mobile-overlay {
+          position: fixed; inset: 0;
+          background: rgba(26,25,22,0.4);
+          backdrop-filter: blur(4px);
+          z-index: 40;
+        }
+
+        @media (min-width: 1024px) {
+          .sidebar-wrapper  { transform: translateX(0) !important; }
+          .mobile-overlay   { display: none !important; }
+          .hod-main-content { margin-left: 240px !important; }
+        }
+      `}</style>
+
+      {/* ── Mobile overlay ── */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            className="mobile-overlay"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onClick={() => setIsMobileMenuOpen(false)}
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 lg:hidden"
           />
         )}
       </AnimatePresence>
 
-      <aside className={cn(
-        "fixed lg:relative w-64 bg-slate-900 flex flex-col h-full shrink-0 shadow-2xl z-50 transition-transform duration-300",
-        isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-      )}>
-        <div className="h-[72px] flex items-center px-6 border-b border-white/5 gap-3">
-          <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center shrink-0 shadow-lg">
-             <span className="text-slate-900 text-sm font-bold">H</span>
+      {/* ── Sidebar ── */}
+      <aside
+        className="sidebar-wrapper"
+        style={{
+          position: 'fixed',
+          top: 0, left: 0, bottom: 0,
+          width: 240,
+          backgroundColor: '#FDFCF9',
+          borderRight: '1.5px solid #E8E6E0',
+          display: 'flex', flexDirection: 'column',
+          zIndex: 50,
+          transform: isMobileMenuOpen ? 'translateX(0)' : 'translateX(-100%)',
+          transition: 'transform 0.3s ease',
+        }}
+      >
+        {/* Wordmark */}
+        <div style={{
+          height: 64, display: 'flex', alignItems: 'center',
+          gap: 10, padding: '0 20px',
+          borderBottom: '1.5px solid #E8E6E0',
+        }}>
+          <div style={{
+            width: 32, height: 32, background: '#1A1916', borderRadius: 10,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}>
+            <span style={{ color: '#F5F4F0', fontSize: 13, fontWeight: 800, fontFamily: 'DM Serif Display, serif' }}>C</span>
           </div>
-          <motion.span className="font-bold text-sm text-white tracking-tight uppercase flex-1">
-            HOD PORTAL
-          </motion.span>
-          <button 
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="lg:hidden text-slate-400 p-2"
-          >
-            <ArrowLeft size={20} />
-          </button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 400, color: '#1A1916', letterSpacing: '-0.02em', fontFamily: 'DM Serif Display, serif' }}>
+              Cursus
+            </div>
+            <div style={{ fontSize: 9, fontWeight: 700, color: '#9E9B94', letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+              HOD Portal
+            </div>
+          </div>
+          {/* HOD role tag */}
+          <span className="hod-tag" style={{ backgroundColor: '#E4ECFB', color: '#5A7AB5', flexShrink: 0 }}>
+            HOD
+          </span>
         </div>
 
-        <nav className="flex-1 py-8 px-4 space-y-2">
-          {tabs.map(t => {
+        {/* Nav */}
+        <nav style={{ flex: 1, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 4, overflowY: 'auto' }}
+          className="hod-scrollarea"
+        >
+          {/* Dot-grid texture strip */}
+          <div className="dot-grid-hod" style={{
+            height: 48, borderRadius: 12, marginBottom: 8, opacity: 0.35,
+            maskImage: 'linear-gradient(to right, black 0%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(to right, black 0%, transparent 100%)',
+          }} />
+
+          {tabs.map((t) => {
             const isActive = tab === t.id;
-            const content = (
-              <>
-                <t.icon size={18} className={cn('shrink-0 transition-transform duration-300', isActive ? 'text-blue-400' : 'group-hover:scale-110')} />
-                <span className="text-xs font-bold tracking-widest uppercase">{t.label}</span>
-                {isActive && (
-                  <motion.div layoutId="hover" className="absolute right-3 w-1.5 h-1.5 bg-blue-400 rounded-full" />
-                )}
-              </>
-            );
-
-            const className = cn(
-              'w-full flex items-center px-4 h-12 rounded-xl transition-all duration-300 gap-4 group relative text-left',
-              isActive 
-                ? 'bg-white/10 text-white shadow-inner border border-white/10' 
-                : 'text-slate-400 hover:bg-white/5 hover:text-white'
-            );
-
             return (
               <button
                 key={t.id}
-                onClick={() => {
-                  setTab(t.id);
-                  setIsMobileMenuOpen(false);
-                }}
-                className={className}
+                onClick={() => { setTab(t.id); setIsMobileMenuOpen(false); }}
+                className={`hod-sidebar-link ${isActive ? 'active' : 'inactive'}`}
               >
-                {content}
+                <t.icon
+                  size={16}
+                  style={{ flexShrink: 0, color: isActive ? '#5A7AB5' : 'currentColor' }}
+                />
+                {t.label}
+                {isActive && (
+                  <motion.span
+                    layoutId="nav-indicator"
+                    style={{
+                      marginLeft: 'auto',
+                      width: 6, height: 6, borderRadius: '50%',
+                      backgroundColor: '#5A7AB5', flexShrink: 0,
+                    }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                  />
+                )}
               </button>
             );
           })}
         </nav>
 
-        <div className="p-4 border-t border-white/5">
-          <Link href="/">
-            <Button variant="ghost" className="w-full justify-start text-slate-400 hover:text-white gap-3 rounded-xl px-4 py-6">
-              <ArrowLeft size={16} />
-              <span className="text-xs font-bold uppercase tracking-widest">Logout</span>
-            </Button>
+        {/* Bottom: back/logout */}
+        <div style={{ padding: '12px', borderTop: '1.5px solid #E8E6E0' }}>
+          <Link href="/" className="hod-btn-ghost" style={{ width: '100%', justifyContent: 'center' }}>
+            <ArrowLeft size={13} />
+            Back to home
           </Link>
         </div>
       </aside>
 
-      {/* Content Area */}
-      <main className="flex-1 overflow-y-auto flex flex-col">
-        {/* Modern floating workspace container */}
-        <div className="flex-1 m-4 sm:m-6 bg-white rounded-3xl border border-app-border shadow-premium overflow-hidden flex flex-col">
-          
-          <header className="px-4 sm:px-8 py-4 sm:py-6 border-b border-app-border shrink-0 flex items-center justify-between bg-white relative z-10">
-            <div className="flex items-center gap-3 min-w-0">
-              <button 
-                onClick={() => setIsMobileMenuOpen(true)}
-                className="lg:hidden p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+      {/* ── Main content area ── */}
+      <main style={{
+        flex: 1,
+
+        display: 'flex', flexDirection: 'column',
+        overflow: 'hidden',
+
+      }}
+        className="hod-main-content"
+      >
+
+        {/* ── Top header ── */}
+        <header style={{
+          height: 64, flexShrink: 0,
+          backgroundColor: 'rgba(245,244,240,0.88)',
+          backdropFilter: 'blur(12px)',
+          borderBottom: '1px solid #E8E6E0',
+          padding: '0 28px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: 16, zIndex: 10, position: 'relative',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+            {/* Mobile menu toggle */}
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="lg:hidden"
+              style={{
+                background: 'none', border: '1.5px solid #E8E6E0', borderRadius: 8,
+                padding: 6, cursor: 'pointer', color: '#6B6860', flexShrink: 0,
+                display: 'flex', alignItems: 'center',
+              }}
+            >
+              <LayoutDashboard size={16} />
+            </button>
+
+            {/* Page title */}
+            <div style={{ minWidth: 0 }}>
+              <h1 style={{
+                fontFamily: 'DM Serif Display, serif',
+                fontSize: 20, fontWeight: 400,
+                letterSpacing: '-0.02em', color: '#1A1916',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                {tabs.find((t) => t.id === tab)?.label}
+              </h1>
+              <p style={{ fontSize: 11, color: '#9E9B94', fontWeight: 500, marginTop: 1 }}>
+                HOD Overview · {batch} academic batch
+              </p>
+            </div>
+          </div>
+
+          {/* Right controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+            {/* Avatar stack */}
+            <div style={{ display: 'flex', alignItems: 'center' }} className="hidden md:flex">
+              {[1,2,3,4].map((i) => (
+                <div key={i} style={{
+                  width: 28, height: 28, borderRadius: '50%',
+                  border: '2px solid #F5F4F0',
+                  backgroundColor: i % 2 === 0 ? '#E4ECFB' : '#E2F5EA',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 9, fontWeight: 800, color: i % 2 === 0 ? '#5A7AB5' : '#4A9068',
+                  marginLeft: i === 1 ? 0 : -8,
+                }}>
+                  {i}
+                </div>
+              ))}
+            </div>
+
+            {/* Batch select */}
+            <Select value={batch} onValueChange={setBatch}>
+              <SelectTrigger style={{
+                width: 120, height: 36,
+                border: '1.5px solid #E8E6E0', backgroundColor: '#FDFCF9',
+                borderRadius: 10, fontSize: 11, fontWeight: 700,
+                letterSpacing: '0.06em', textTransform: 'uppercase',
+                fontFamily: 'DM Sans, sans-serif', color: '#1A1916',
+              }}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent style={{ borderRadius: 14, border: '1.5px solid #E8E6E0', fontFamily: 'DM Sans, sans-serif' }}>
+                <SelectItem value="BCA 2023" style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>BCA 2023</SelectItem>
+                <SelectItem value="BCA 2024" style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>BCA 2024</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Settings icon button */}
+            <button className="hod-btn-ghost" style={{ padding: '8px 10px', gap: 0 }}>
+              <Settings size={15} />
+            </button>
+          </div>
+        </header>
+
+        {/* ── Scrollable content ── */}
+        <div
+          className="hod-scrollarea"
+          style={{ flex: 1, overflowY: 'auto', padding: '28px 28px 40px', backgroundColor: '#F5F4F0', position: 'relative' }}
+        >
+          {/* Dot grid — top fading texture */}
+          <div className="dot-grid-hod" style={{
+            position: 'absolute', top: 0, left: 0, right: 0, height: 200,
+            opacity: 0.3, pointerEvents: 'none',
+            maskImage: 'linear-gradient(to bottom, black 0%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, black 0%, transparent 100%)',
+            zIndex: 0,
+          }} />
+
+          <div style={{ maxWidth: 1100, margin: '0 auto', position: 'relative', zIndex: 1 }}>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={tab}
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
               >
-                <LayoutDashboard size={20} />
-              </button>
-              <div className="min-w-0">
-                <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 capitalize truncate">{tab} Dashboard</h1>
-                <p className="hidden sm:block text-[13px] text-app-muted mt-1 truncate">HOD Overview for {batch} academic batch.</p>
-              </div>
-            </div>
 
-            <div className="flex items-center gap-2 sm:gap-4">
-              <div className="hidden md:flex -space-x-2 mr-4">
-                {[1,2,3,4].map(i => (
-                  <div key={i} className="w-8 h-8 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400">
-                    {i}
-                  </div>
-                ))}
-              </div>
-              <Select value={batch} onValueChange={setBatch}>
-                <SelectTrigger className="w-24 sm:w-32 h-9 sm:h-10 border-slate-200 bg-slate-50 rounded-xl text-[10px] sm:text-[11px] font-bold uppercase tracking-widest shadow-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl shadow-xl">
-                  <SelectItem value="BCA 2023" className="font-bold text-[11px] uppercase py-2.5">BCA 2023</SelectItem>
-                  <SelectItem value="BCA 2024" className="font-bold text-[11px] uppercase py-2.5">BCA 2024</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button size="icon" variant="ghost" className="rounded-xl w-10 h-10 border border-slate-100 bg-slate-50/50">
-                <Settings size={18} className="text-slate-400" />
-              </Button>
-            </div>
-          </header>
+                {/* ── Overview ── */}
+                {tab === 'overview' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                    <StatsRow totalStudents={64} avgCompletion={58} atRisk={12} onTrack={34} />
 
-          <div className="flex-1 overflow-y-auto p-10 bg-slate-50/20">
-            <div className="max-w-6xl mx-auto space-y-10">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={tab}
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  {tab === 'overview' && (
-                    <div className="space-y-10">
-                      <StatsRow totalStudents={64} avgCompletion={58} atRisk={12} onTrack={34} />
-                      
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <div className="p-8 rounded-3xl border border-slate-200 bg-white shadow-premium">
-                           <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-6">Subject Progress</h3>
-                           <SubjectChart />
-                        </div>
-                        <div className="p-8 rounded-3xl border border-slate-200 bg-white shadow-premium">
-                           <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-6">Batch Velocity</h3>
-                           <ProgressChart />
-                        </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
+                      <div className="hod-card" style={{ padding: '28px 24px' }}>
+                        <SectionLabel>Subject Progress</SectionLabel>
+                        <SubjectChart />
                       </div>
-
-                      <AtRiskTable />
+                      <div className="hod-card" style={{ padding: '28px 24px' }}>
+                        <SectionLabel>Batch Velocity</SectionLabel>
+                        <ProgressChart />
+                      </div>
                     </div>
-                  )}
 
-                  {tab === 'students' && (
-                    <div className="p-20 text-center space-y-4 rounded-3xl border-2 border-dashed border-slate-200 bg-slate-50/50">
-                       <Users size={64} className="mx-auto text-slate-300 stroke-[1.5]" />
-                       <div className="max-w-xs mx-auto">
-                        <h3 className="text-lg font-bold text-slate-800">Student Management</h3>
-                        <p className="text-sm text-slate-400 mt-2 font-medium">This section will contain detailed reports, individual progress files, and risk alerts for {batch}.</p>
-                       </div>
-                    </div>
-                  )}
+                    <AtRiskTable />
+                  </div>
+                )}
 
-                  {tab === 'subjects' && (
-                    <div className="p-20 text-center space-y-4 rounded-3xl border-2 border-dashed border-slate-200 bg-slate-50/50">
-                       <BarChart3 size={64} className="mx-auto text-slate-300 stroke-[1.5]" />
-                       <div className="max-w-xs mx-auto">
-                        <h3 className="text-lg font-bold text-slate-800">Syllabus Expansion</h3>
-                        <p className="text-sm text-slate-400 mt-2 font-medium">Review subject-wise coverage bottlenecks and faculty feedback for current semester units.</p>
-                       </div>
-                    </div>
-                  )}
+                {/* ── Students placeholder ── */}
+                {tab === 'students' && (
+                  <EmptyState
+                    icon={<Users size={52} strokeWidth={1.5} style={{ color: '#C8C6BF' }} />}
+                    title="Student Directory"
+                    desc={`Detailed reports, individual progress files, and risk alerts for ${batch} will appear here.`}
+                  />
+                )}
 
-                  {tab === 'classes' && (
-                      <ClassManagement />
-                  )}
+                {/* ── Subjects placeholder ── */}
+                {tab === 'subjects' && (
+                  <EmptyState
+                    icon={<BarChart3 size={52} strokeWidth={1.5} style={{ color: '#C8C6BF' }} />}
+                    title="Syllabus Coverage"
+                    desc="Review subject-wise coverage bottlenecks and faculty feedback for current semester units."
+                  />
+                )}
 
-                  {tab === 'syllabus-config' && (
-                      <SyllabusManager />
-                  )}
-                </motion.div>
-              </AnimatePresence>
-            </div>
+                {/* ── Classes ── */}
+                {tab === 'classes' && <ClassManagement />}
+
+                {/* ── Syllabus config ── */}
+                {tab === 'syllabus-config' && <SyllabusManager />}
+
+              </motion.div>
+            </AnimatePresence>
           </div>
         </div>
       </main>
+    </div>
+  );
+}
+
+/* ── Small helpers ── */
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p style={{
+      fontSize: 10, fontWeight: 700, letterSpacing: '0.14em',
+      textTransform: 'uppercase', color: '#B0AEA7', marginBottom: 20,
+      fontFamily: 'DM Sans, sans-serif',
+    }}>
+      {children}
+    </p>
+  );
+}
+
+function EmptyState({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      padding: '80px 40px', textAlign: 'center', gap: 16,
+      border: '1.5px dashed #E8E6E0', borderRadius: 20,
+      backgroundColor: '#FDFCF9',
+    }}>
+      {icon}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '4px 0' }}>
+        <div style={{ width: 32, height: 2, backgroundColor: '#E8E6E0', borderRadius: 2 }} />
+        <h3 style={{
+          fontFamily: 'DM Serif Display, serif', fontSize: 22,
+          fontWeight: 400, letterSpacing: '-0.02em', color: '#1A1916',
+        }}>
+          {title}
+        </h3>
+        <div style={{ width: 32, height: 2, backgroundColor: '#E8E6E0', borderRadius: 2 }} />
+      </div>
+      <p style={{ fontSize: 13, color: '#7A7872', maxWidth: 360, lineHeight: 1.65, fontWeight: 400 }}>
+        {desc}
+      </p>
     </div>
   );
 }
