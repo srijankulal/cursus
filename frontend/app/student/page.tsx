@@ -8,6 +8,7 @@ import { Syllabus } from '@/components/student/Syllabus';
 import { StudyPlan } from '@/components/student/StudyPlan';
 import { AskAI } from '@/components/student/AskAI';
 import { syllabus, type Semester } from '@/models/syllabus';
+import { ResourceViewer } from '@/components/student/ResourceViewer';
 import { storage } from '@/lib/storage';
 
 interface StudentProfile {
@@ -29,6 +30,7 @@ const TITLES: Record<string, { title: string; sub: string; hue: string }> = {
   dashboard:    { title: 'Overview',   sub: 'Your risk status and recent progress at a glance.', hue: 'bg-blue-600' },
   syllabus:     { title: 'Syllabus Explorer',    sub: 'Browse topics, mark them done, and identify high-yield areas.', hue: 'bg-amber-500' },
   'study-plan': { title: 'AI Study Plan',  sub: 'Let Gemini AI build a day-by-day plan based on what\'s left.', hue: 'bg-emerald-600' },
+  resources:    { title: 'Study Materials',  sub: 'Download notes and past question papers uploaded by faculty.', hue: 'bg-cyan-500' },
   'ask-ai':     { title: 'Ask Gemini',      sub: 'Have a conversation with AI about specific BCA topics.', hue: 'bg-indigo-600' },
 };
 
@@ -84,6 +86,7 @@ useEffect(() => {
       case 'dashboard':   return <Dashboard profile={profile} sem={sem} />;
       case 'syllabus':    return <Syllabus activeSemesterId={sem.id} />;
       case 'study-plan':  return <StudyPlan />;
+      case 'resources':   return <ResourceViewer semester={profile?.semester || 1} />;
       case 'ask-ai':      return <AskAI />;
       default:            return <Dashboard profile={profile} sem={sem} />;
     }

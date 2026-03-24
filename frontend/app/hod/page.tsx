@@ -9,7 +9,9 @@ import { ProgressChart } from '@/components/hod/ProgressChart';
 import { ClassManagement } from '@/components/hod/ClassManagement';
 import { SyllabusManager } from '@/components/hod/SyllabusManager';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, LayoutDashboard, Users, GraduationCap, BarChart3, Settings } from 'lucide-react';
+import { ArrowLeft, LayoutDashboard, Users, GraduationCap, BarChart3, Settings, Upload } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { UploadManager } from '@/components/hod/UploadManager';
 import Link from 'next/link';
 
 /* ─────────────────────────────────────────────
@@ -21,11 +23,12 @@ import Link from 'next/link';
 ───────────────────────────────────────────── */
 
 const tabs = [
-  { id: 'overview',        label: 'Overview',          icon: LayoutDashboard },
-  { id: 'classes',         label: 'Classes',           icon: GraduationCap  },
-  { id: 'students',        label: 'Student Directory', icon: Users          },
-  { id: 'subjects',        label: 'Syllabus Coverage', icon: BarChart3      },
-  { id: 'syllabus-config', label: 'Config Syllabus',   icon: Settings       },
+  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { id: 'classes', label: 'Classes', icon: GraduationCap },  
+  { id: 'students', label: 'Student Directory', icon: Users },
+  { id: 'subjects', label: 'Syllabus Coverage', icon: BarChart3 },
+  { id: 'syllabus-config', label: 'Config Syllabus', icon: Settings },
+  { id: 'uploads', label: 'Uploads', icon: Upload },
 ];
 
 export default function HODPage() {
@@ -376,6 +379,10 @@ export default function HODPage() {
                 {/* ── Syllabus config ── */}
                 {tab === 'syllabus-config' && <SyllabusManager />}
 
+
+                  {tab === 'uploads' && (
+                      <UploadManager />
+                  )}
               </motion.div>
             </AnimatePresence>
           </div>

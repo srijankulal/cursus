@@ -5,14 +5,24 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, LayoutDashboard, BookOpen, Users, ClipboardCheck, Settings, Bell, Calendar } from 'lucide-react';
+import { ArrowLeft, LayoutDashboard, BookOpen, Users, ClipboardCheck, Settings, Bell, Calendar, Upload } from 'lucide-react';
+import { UploadManager } from '@/components/hod/UploadManager';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
 const tabs = [
   { id: 'dashboard', label: 'My Classes', icon: BookOpen },
   { id: 'attendance', label: 'Attendance', icon: ClipboardCheck },
+<<<<<<< HEAD
+<<<<<<< Updated upstream
+  { id: 'students', label: 'Student Progress', icon: Users },
+=======
   { id: 'students', label: 'Manage Students', icon: Users },
+  { id: 'uploads', label: 'Upload Notes/Docs', icon: Upload },
+>>>>>>> Stashed changes
+=======
+  { id: 'students', label: 'Manage Students', icon: Users },
+>>>>>>> 4e062c9ec85af7bcc83809741dd8e68e64ac7f57
 ];
 
 interface StaffClass {
@@ -317,6 +327,17 @@ export default function StaffPage() {
                   )}
 
                   {tab === 'students' && (
+<<<<<<< HEAD
+<<<<<<< Updated upstream
+                    <div className="p-20 text-center space-y-6 rounded-[2rem] border-2 border-dashed border-indigo-100 bg-indigo-50/20">
+                       <Users size={64} className="mx-auto text-indigo-200" />
+                       <div className="max-w-xs mx-auto">
+                        <h3 className="text-lg font-bold text-slate-800">Student Progress View</h3>
+                        <p className="text-sm text-slate-500 mt-2 font-medium">See how many students have marked specific units as done and identify high-yield confusion points.</p>
+                       </div>
+=======
+=======
+>>>>>>> 4e062c9ec85af7bcc83809741dd8e68e64ac7f57
                     <div className="space-y-6 rounded-4xl border border-indigo-100 bg-white p-8 shadow-sm">
                       <h3 className="text-lg font-bold text-slate-900">Class Guide Student Management</h3>
 
@@ -336,6 +357,11 @@ export default function StaffPage() {
                                       {item.name} - Sem {item.semester}
                                     </SelectItem>
                                   ))}
+<<<<<<< HEAD
+
+                            
+=======
+>>>>>>> 4e062c9ec85af7bcc83809741dd8e68e64ac7f57
                                 </SelectContent>
                               </Select>
                             </div>
@@ -348,6 +374,10 @@ export default function StaffPage() {
                                   setNewRollNumber(value);
                                 }}
                               >
+<<<<<<< HEAD
+                                
+=======
+>>>>>>> 4e062c9ec85af7bcc83809741dd8e68e64ac7f57
                                 <SelectTrigger>
                                   <SelectValue placeholder="Pick student" />
                                 </SelectTrigger>
@@ -381,6 +411,11 @@ export default function StaffPage() {
                               {feedback}
                             </div>
                           )}
+<<<<<<< HEAD
+                          
+              
+=======
+>>>>>>> 4e062c9ec85af7bcc83809741dd8e68e64ac7f57
 
                           <div className="rounded-2xl border border-slate-200 bg-slate-50/40 p-4">
                             <h4 className="text-sm font-bold text-slate-800 mb-3">Students in selected class</h4>
@@ -399,7 +434,15 @@ export default function StaffPage() {
                           </div>
                         </>
                       )}
+<<<<<<< HEAD
+>>>>>>> Stashed changes
+=======
+>>>>>>> 4e062c9ec85af7bcc83809741dd8e68e64ac7f57
                     </div>
+                  )}
+
+                  {tab === 'uploads' && (
+                      <UploadManager staffMode={true} />
                   )}
                 </motion.div>
               </AnimatePresence>
