@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import { cookies } from 'next/headers';
-import { SESSION_COOKIE_NAME, isSessionRole } from '@/lib/auth/session';
+import { SESSION_COOKIE_NAME, SESSION_USER_ID_COOKIE_NAME, isSessionRole } from '@/lib/auth/session';
 import { connectToDatabase } from '@/lib/mongoose';
 import { Hod } from '@/models/hod';
 import { Class } from '@/models/class';
+import '@/models/student';
+
+interface CourseAssignmentInput {
+  subjectId?: string;
+  subjectName?: string;
+  faculty?: string;
+}
 
 // Helper to get current HOD from session
 async function getCurrentHOD(request: NextRequest) {
@@ -14,7 +22,14 @@ async function getCurrentHOD(request: NextRequest) {
     return null;
   }
 
-  const userId = request.headers.get('x-user-id');
+  const userId =
+    cookieStore.get(SESSION_USER_ID_COOKIE_NAME)?.value ||
+    request.headers.get('x-user-id');
+
+  if (userId && !mongoose.isValidObjectId(userId)) {
+    return null;
+  }
+
   if (!userId) return null;
 
   await connectToDatabase();
@@ -39,7 +54,7 @@ export async function PUT(
 
     const { id } = await Promise.resolve(params);
     const body = await request.json();
-    const { name, semester, capacity, classGuide, faculties } = body;
+    const { name, semester, capacity, classGuide, faculties, courseAssignments } = body;
 
     await connectToDatabase();
 
@@ -60,13 +75,48 @@ export async function PUT(
     if (semester) classToUpdate.semester = semester;
     if (capacity) classToUpdate.capacity = capacity;
     if (classGuide) classToUpdate.classGuide = classGuide;
-    if (faculties) classToUpdate.faculties = faculties;
+
+    if (Array.isArray(courseAssignments)) {
+      const normalizedAssignments = courseAssignments
+        .filter((assignment: CourseAssignmentInput) =>
+          assignment?.subjectId && assignment?.subjectName && assignment?.faculty
+        )
+        .map((assignment: CourseAssignmentInput) => ({
+          subjectId: String(assignment.subjectId).trim(),
+          subjectName: String(assignment.subjectName).trim(),
+          faculty: new mongoose.Types.ObjectId(String(assignment.faculty)),
+        }));
+
+      classToUpdate.courseAssignments = normalizedAssignments;
+
+      const derivedFaculties = new Set<string>();
+      const classGuideId = classGuide || classToUpdate.classGuide?.toString();
+
+      if (classGuideId) {
+        derivedFaculties.add(String(classGuideId));
+      }
+
+      normalizedAssignments.forEach((assignment) => {
+        derivedFaculties.add(assignment.faculty.toString());
+      });
+
+      if (Array.isArray(faculties)) {
+        faculties.forEach((facultyId: string) => derivedFaculties.add(String(facultyId)));
+      }
+
+      classToUpdate.faculties = Array.from(derivedFaculties).map(
+        (facultyId) => new mongoose.Types.ObjectId(facultyId)
+      );
+    } else if (faculties) {
+      classToUpdate.faculties = faculties;
+    }
 
     await classToUpdate.save();
 
     const updatedClass = await Class.findById(id)
       .populate('classGuide', 'name email')
       .populate('faculties', 'name email')
+      .populate('courseAssignments.faculty', 'name email')
       .populate('students', 'rollNumber')
       .exec();
 

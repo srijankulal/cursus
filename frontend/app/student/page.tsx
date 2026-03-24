@@ -7,8 +7,23 @@ import { Dashboard } from '@/components/student/Dashboard';
 import { Syllabus } from '@/components/student/Syllabus';
 import { StudyPlan } from '@/components/student/StudyPlan';
 import { AskAI } from '@/components/student/AskAI';
-import { syllabus } from '@/models/syllabus';
+import { syllabus, type Semester } from '@/models/syllabus';
 import { storage } from '@/lib/storage';
+
+interface StudentProfile {
+  _id: string;
+  name: string;
+  email: string;
+  department: string;
+  semester: number;
+  rollNumber: string;
+  class: {
+    _id: string;
+    name: string;
+    semester: number;
+    department: string;
+  } | null;
+}
 
 const TITLES: Record<string, { title: string; sub: string; hue: string }> = {
   dashboard:    { title: 'Overview',   sub: 'Your risk status and recent progress at a glance.', hue: 'bg-blue-600' },
@@ -19,26 +34,47 @@ const TITLES: Record<string, { title: string; sub: string; hue: string }> = {
 
 export default function StudentPage() {
   const [tab, setTab] = useState('dashboard');
-  const [progress, setProgress] = useState(0);
   const [collapsed, setCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const sem = syllabus[0];
+  const [profile, setProfile] = useState<StudentProfile | null>(null);
+  const sem: Semester = profile?.semester
+    ? syllabus.find((item) => item.id === `sem${profile.semester}`) ?? syllabus[0]
+    : syllabus[0];
+
+  const done = storage.getCompletedTopics().length;
+  const total = sem.subjects.flatMap(s => s.units.flatMap(u => u.topics)).length;
+  const progress = Math.round((done / total) * 100);
 
   useEffect(() => {
-    const done = storage.getCompletedTopics().length;
-    const total = sem.subjects.flatMap(s => s.units.flatMap(u => u.topics)).length;
-    setProgress(Math.round((done / total) * 100));
-  }, [tab]);
+    async function loadProfile() {
+      try {
+        const response = await fetch('/api/student/profile', { cache: 'no-store' });
+        const data = await response.json();
+
+        if (!response.ok) {
+          return;
+        }
+
+        if (data.profile) {
+          setProfile(data.profile as StudentProfile);
+        }
+      } catch {
+        // Keep dashboard usable with fallback content when profile request fails.
+      }
+    }
+
+    void loadProfile();
+  }, []);
 
   const page = TITLES[tab] ?? TITLES.dashboard;
 
   const renderContent = () => {
     switch (tab) {
-      case 'dashboard':   return <Dashboard />;
+      case 'dashboard':   return <Dashboard profile={profile} sem={sem} />;
       case 'syllabus':    return <Syllabus activeSemesterId={sem.id} />;
       case 'study-plan':  return <StudyPlan />;
       case 'ask-ai':      return <AskAI />;
-      default:            return <Dashboard />;
+      default:            return <Dashboard profile={profile} sem={sem} />;
     }
   };
 
@@ -50,7 +86,7 @@ export default function StudentPage() {
           setTab(t);
           setIsMobileMenuOpen(false);
         }}
-        semesterName={sem.name}
+        semesterName={profile ? `Semester ${profile.semester}` : sem.name}
         progress={progress}
         collapsed={collapsed}
         setCollapsed={setCollapsed}
@@ -91,15 +127,11 @@ export default function StudentPage() {
               </AnimatePresence>
             </div>
             
-            <div className="flex -space-x-2 shrink-0">
-               {[1, 2].map(i => (
-                 <div key={i} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-white bg-neutral-100 flex items-center justify-center text-[10px] font-bold text-neutral-400">
-                   {i}
-                 </div>
-               ))}
-               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-white bg-neutral-900 flex items-center justify-center text-[10px] font-bold text-white">
-                 +
-               </div>
+            <div className="shrink-0 rounded-xl border border-app-border bg-white px-3 py-2 text-right shadow-sm">
+              <p className="text-[11px] font-bold text-neutral-900">{profile?.name ?? 'Student'}</p>
+              <p className="text-[10px] font-medium text-app-muted">
+                {profile?.rollNumber ? `Roll: ${profile.rollNumber}` : 'Roll number not set'}
+              </p>
             </div>
           </header>
 
@@ -125,6 +157,6 @@ export default function StudentPage() {
   );
 }
 
-function cn(...inputs: any[]) {
+function cn(...inputs: Array<string | false | null | undefined>) {
   return inputs.filter(Boolean).join(' ');
 }
