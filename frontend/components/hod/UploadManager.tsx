@@ -94,17 +94,17 @@ export function UploadManager({ staffMode = false }: UploadManagerProps) {
   };
 
   return (
-    <div className="w-full flex justify-center py-6">
-      <Card className="w-full max-w-xl shadow-premium border-slate-200">
+    <div className="w-full flex justify-center px-4 py-6 sm:px-6 lg:px-10">
+      <Card className="w-full max-w-3xl rounded-none shadow-premium border-slate-200">
         <CardHeader>
           <CardTitle className="text-xl">Upload Document</CardTitle>
           <CardDescription>Upload notes or question papers for the syllabus.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 px-4 pb-4 sm:px-6">
           
           {/* Status Message Banner */}
           {statusMessage.text && (
-            <div className={`p-3 rounded-lg text-sm font-medium ${statusMessage.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+            <div className={`p-3 text-sm font-medium rounded-none ${statusMessage.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
               {statusMessage.text}
             </div>
           )}
@@ -113,10 +113,10 @@ export function UploadManager({ staffMode = false }: UploadManagerProps) {
             <div className="space-y-2">
               <label className="text-[13px] font-bold text-slate-500 uppercase tracking-widest">Document Type</label>
               <Select value={documentType} onValueChange={setDocumentType} disabled={isUploading}>
-                <SelectTrigger className="w-full h-11 bg-slate-50">
+                <SelectTrigger className="w-full h-11 bg-slate-50 rounded-none border-slate-200">
                   <SelectValue placeholder="Select type..." />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-none">
                   <SelectItem value="notes">Notes</SelectItem>
                   <SelectItem value="question_papers">Question Papers</SelectItem>
                 </SelectContent>
@@ -124,32 +124,32 @@ export function UploadManager({ staffMode = false }: UploadManagerProps) {
             </div>
           )}
         
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <label className="text-[13px] font-bold text-slate-500 uppercase tracking-widest">Subject</label>
-              <Input placeholder="e.g. Mathematics" value={subject} onChange={(e) => setSubject(e.target.value)} disabled={isUploading} className="h-11 bg-slate-50" />
+              <Input placeholder="e.g. Mathematics" value={subject} onChange={(e) => setSubject(e.target.value)} disabled={isUploading} className="h-11 bg-slate-50 rounded-none border-slate-200" />
             </div>
             <div className="space-y-2">
               <label className="text-[13px] font-bold text-slate-500 uppercase tracking-widest">Semester</label>
-              <Input type="number" min="1" max="6" placeholder="e.g. 1" value={semester} onChange={(e) => setSemester(e.target.value)} disabled={isUploading} className="h-11 bg-slate-50" />
+              <Input type="number" min="1" max="6" placeholder="e.g. 1" value={semester} onChange={(e) => setSemester(e.target.value)} disabled={isUploading} className="h-11 bg-slate-50 rounded-none border-slate-200" />
             </div>
           </div>
 
           <div className="space-y-2">
             <label className="text-[13px] font-bold text-slate-500 uppercase tracking-widest">Department</label>
-            <Input placeholder="e.g. Computer Science" value={department} onChange={(e) => setDepartment(e.target.value)} disabled={isUploading} className="h-11 bg-slate-50" />
+            <Input placeholder="e.g. Computer Science" value={department} onChange={(e) => setDepartment(e.target.value)} disabled={isUploading} className="h-11 bg-slate-50 rounded-none border-slate-200" />
           </div>
 
           <div className="space-y-2">
             <label className="text-[13px] font-bold text-slate-500 uppercase tracking-widest">Select File</label>
-            <Input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" disabled={isUploading} className="h-11 bg-slate-50 pt-2.5" />
+            <Input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" disabled={isUploading} className="h-11 bg-slate-50 pt-2.5 rounded-none border-slate-200" />
           </div>
         </CardContent>
-        <CardFooter className="flex justify-end gap-3 rounded-b-xl border-t border-slate-100 bg-slate-50/50 p-6">
-          <Button variant="outline" onClick={handleClear} disabled={isUploading} className="rounded-xl">
+        <CardFooter className="flex flex-wrap justify-end gap-3 rounded-none border-t border-slate-100 bg-slate-50/50 px-4 py-4 sm:px-6">
+          <Button variant="outline" onClick={handleClear} disabled={isUploading} className="rounded-none px-4">
             Clear
           </Button>
-          <Button onClick={handleUpload} disabled={!documentType || !selectedFile || !subject || !semester || !department || isUploading} className="rounded-xl bg-slate-900 text-white hover:bg-slate-800">
+          <Button onClick={handleUpload} disabled={!documentType || !selectedFile || !subject || !semester || !department || isUploading} className="rounded-none bg-slate-900 px-4 text-white hover:bg-slate-800">
             {isUploading ? "Uploading..." : "Upload File"}
           </Button>
         </CardFooter>
