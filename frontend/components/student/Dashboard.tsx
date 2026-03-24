@@ -79,21 +79,19 @@ function StatCard({
 }
 
 export const Dashboard = ({ profile, sem }: { profile: StudentProfile | null; sem: Semester }) => {
-  const allTopics = sem.subjects.flatMap(s => s.units.flatMap(u => u.topics));
-  const allHY = allTopics.filter(t => t.isHighYield);
+const allTopics = sem.subjects.flatMap((s) => s.units.flatMap((u) => u.topics));
+const allHY = allTopics.filter((t) => t.isHighYield);
 
-  const completedIds = storage.getCompletedTopics();
-  const examDate = storage.getExamDate() || EXAM_DATE_DEFAULT;
-  const status: RiskStatus = calculateRisk(allTopics.length, completedIds.length, examDate);
-  const recentTopics = [...completedIds]
-    .reverse()
-    .slice(0, 5)
-    .map((id) => allTopics.find((topic) => topic.id === id)?.name ?? id);
+const completedIds = storage.getCompletedTopics();
+const examDate = storage.getExamDate() || EXAM_DATE_DEFAULT;
+const status: RiskStatus = calculateRisk(allTopics.length, completedIds.length, examDate);
+const recentTopics = [...completedIds]
+  .reverse()
+  .slice(0, 5)
+  .map((id) => allTopics.find((topic) => topic.id === id)?.name ?? id);
 
-  const allTopics = sem.subjects.flatMap(s => s.units.flatMap(u => u.topics));
-  const allHY = allTopics.filter(t => t.isHighYield);
-  const risk = riskMap[status.riskLevel];
-  const hyLeft = allHY.length - completedIds.filter(id => allHY.some(t => t.id === id)).length;
+const risk = riskMap[status.riskLevel];
+const hyLeft = allHY.length - completedIds.filter((id) => allHY.some((t) => t.id === id)).length;
 
   return (
     <div className="space-y-10 pb-10">
@@ -221,7 +219,7 @@ export const Dashboard = ({ profile, sem }: { profile: StudentProfile | null; se
                   >
                     <div className="flex-1 min-w-0 mr-8">
                       <div className="flex justify-between items-center mb-3">
-                         <span className="text-[15px] font-bold text-neutral-900 tracking-tight">{sub.name}</span>
+                         <span className="text-[15px] font-bold text-neutral-900 tracking-tight">{sub.subject_name}</span>
                          <span className={cn("text-xs font-bold px-2 py-0.5 rounded-lg bg-neutral-100", accent.replace('bg-', 'text-'))}>{pct}%</span>
                       </div>
                       <div className="h-2 rounded-full bg-neutral-100 overflow-hidden shadow-inner ring-1 ring-black/5">
