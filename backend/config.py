@@ -22,7 +22,7 @@ class Settings(BaseModel):
     pinecone_qpaper_namespace: str = "qpaper"
 
     gemini_api_key: str
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-3-flash-preview"
 
     chunk_size: int = 1200
     chunk_overlap: int = 200
@@ -56,7 +56,7 @@ def load_settings() -> Settings:
         pinecone_notes_namespace=os.getenv("PINECONE_NOTES_NAMESPACE", "notes"),
         pinecone_qpaper_namespace=os.getenv("PINECONE_QPAPER_NAMESPACE", "qpaper"),
         gemini_api_key=get_required_env("GEMINI_API_KEY"),
-        gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+        gemini_model=os.getenv("GEMINI_MODEL", "gemini-3-flash-preview"),
         chunk_size=int(os.getenv("CHUNK_SIZE", "1200")),
         chunk_overlap=int(os.getenv("CHUNK_OVERLAP", "200")),
         request_timeout_seconds=int(os.getenv("REQUEST_TIMEOUT_SECONDS", "45")),

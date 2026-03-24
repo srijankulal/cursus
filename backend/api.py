@@ -12,6 +12,7 @@ from backend.schemas import (
 from backend.services import (
     get_ingestion_status,
     ingest_document,
+    list_ingestions,
     query_clean,
     query_vectors,
 )
@@ -34,6 +35,12 @@ def healthcheck() -> dict[str, str]:
 def ingestion_status(document_id: str) -> dict[str, Any]:
     state: AppState = app.state.state
     return get_ingestion_status(state, document_id)
+
+
+@app.get("/ingest")
+def ingestion_list() -> dict[str, list[dict[str, Any]]]:
+    state: AppState = app.state.state
+    return {"documents": list_ingestions(state)}
 
 
 @app.post("/ingest", response_model=IngestResponse)

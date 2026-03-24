@@ -1,7 +1,9 @@
 import hashlib
 import json
 import os
+import random
 import tempfile
+import time
 import uuid
 from datetime import UTC, datetime
 from typing import Any, Literal
@@ -10,6 +12,7 @@ import requests
 from fastapi import HTTPException
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from requests import HTTPError, RequestException
 
 from backend.config import Settings
 from backend.schemas import (
@@ -172,6 +175,129 @@ def embed_texts(
         vectors.append(list(values))
     return vectors
 
+def _compute_retry_delay(response: requests.Response, attempt: int) -> float:
+    retry_after = response.headers.get("Retry-After", "").strip()
+    if retry_after:
+        try:
+            return max(float(retry_after), 0.5)
+        except ValueError:
+            pass
+    return (2**attempt) + random.uniform(0.0, 0.3)
+
+
+def post_gemini_with_retry(
+    state: AppState,
+    payload: dict[str, Any],
+    *,
+    max_attempts: int = 2,
+    operation: str = "request",
+) -> dict[str, Any]:
+    url = (
+        f"https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{state.settings.gemini_model}:generateContent"
+    )
+
+    last_response: requests.Response | None = None
+
+    for attempt in range(max_attempts):
+        response = requests.post(
+            f"{url}?key={state.settings.gemini_api_key}",
+            json=payload,
+            timeout=state.settings.request_timeout_seconds,
+        )
+        last_response = response
+
+        if response.status_code in {429, 503} and attempt < max_attempts - 1:
+            time.sleep(_compute_retry_delay(response, attempt))
+            continue
+
+        response.raise_for_status()
+        return response.json()
+
+    if last_response is not None:
+        last_response.raise_for_status()
+    raise HTTPException(
+        status_code=502,
+        detail=f"Upstream LLM request failed during {operation}.",
+    )
+
+
+def map_ingest_exception(exc: Exception) -> HTTPException:
+    if isinstance(exc, HTTPException):
+        return exc
+
+    if isinstance(exc, HTTPError):
+        status = exc.response.status_code if exc.response is not None else None
+        if status == 429:
+            return HTTPException(
+                status_code=429,
+                detail="Rate limit reached while parsing with Gemini. Please retry in 30-60 seconds.",
+            )
+        if status in {401, 403}:
+            return HTTPException(
+                status_code=502,
+                detail="Gemini authentication failed. Check API key and project access.",
+            )
+        return HTTPException(
+            status_code=502,
+            detail="Upstream LLM request failed during ingestion.",
+        )
+
+    if isinstance(exc, RequestException):
+        return HTTPException(
+            status_code=502,
+            detail="Network error while contacting Gemini during ingestion.",
+        )
+
+    return HTTPException(
+        status_code=500,
+        detail="Ingestion failed unexpectedly. Please try again.",
+    )
+
+
+def map_query_exception(exc: Exception) -> HTTPException:
+    if isinstance(exc, HTTPException):
+        return exc
+
+    if isinstance(exc, HTTPError):
+        status = exc.response.status_code if exc.response is not None else None
+        if status == 429:
+            return HTTPException(
+                status_code=429,
+                detail="Gemini rate limit reached while answering query. Please retry in 30-60 seconds.",
+            )
+        if status in {401, 403}:
+            return HTTPException(
+                status_code=502,
+                detail="Gemini authentication failed while answering query. Check API key and project access.",
+            )
+        if status == 503:
+            return HTTPException(
+                status_code=503,
+                detail="Gemini service is temporarily unavailable. Please retry shortly.",
+            )
+        return HTTPException(
+            status_code=502,
+            detail="Upstream LLM request failed while answering query.",
+        )
+
+    if isinstance(exc, RequestException):
+        return HTTPException(
+            status_code=502,
+            detail="Network error while contacting Gemini for query answer.",
+        )
+
+    return HTTPException(
+        status_code=500,
+        detail="Query failed unexpectedly. Please try again.",
+    )
+
+
+def internal_error_summary(exc: Exception) -> str:
+    if isinstance(exc, HTTPError):
+        status = exc.response.status_code if exc.response is not None else "unknown"
+        return f"HTTPError status={status}"
+    return exc.__class__.__name__
 
 def upsert_vectors(state: AppState, namespace: str, vectors: list[dict[str, Any]]) -> None:
     batch_size = state.settings.pinecone_batch_size
@@ -182,27 +308,19 @@ def upsert_vectors(state: AppState, namespace: str, vectors: list[dict[str, Any]
 
 
 def parse_questions_with_gemini(state: AppState, text: str) -> list[dict[str, Any]]:
-    url = (
-        f"https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{state.settings.gemini_model}:generateContent"
-    )
     system_prompt = (
-        "You are an exam parser. Extract each question from the provided text and return only a JSON array. "
+        "You are an exam parser. Extract every question from the provided exam text and return only a JSON array. "
+        "Do not skip questions. Preserve order. "
         "Each object fields: question_number (string), question_text (string), question_type (string), "
         "marks (number or null), section (string or null), difficulty_hint (easy|medium|hard|null)."
     )
     payload = {
         "system_instruction": {"parts": [{"text": system_prompt}]},
         "contents": [{"parts": [{"text": text}]}],
-        "generationConfig": {"temperature": 0.0, "maxOutputTokens": 2048},
+        "generationConfig": {"temperature": 0.0, "maxOutputTokens": 8192},
     }
-    response = requests.post(
-        f"{url}?key={state.settings.gemini_api_key}",
-        json=payload,
-        timeout=state.settings.request_timeout_seconds,
-    )
-    response.raise_for_status()
-    data = response.json()
+
+    data = post_gemini_with_retry(state, payload, max_attempts=4)
     candidates = data.get("candidates", [])
     if not candidates:
         return []
@@ -221,10 +339,6 @@ def generate_clean_notes_answer(
 ) -> str:
     context_block = "\n\n".join(
         f"Context {index + 1}:\n{context}" for index, context in enumerate(contexts)
-    )
-    url = (
-        f"https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{state.settings.gemini_model}:generateContent"
     )
     style_instructions = {
         "brief": "Respond in 3-5 concise sentences.",
@@ -253,13 +367,7 @@ def generate_clean_notes_answer(
         ],
         "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1024},
     }
-    response = requests.post(
-        f"{url}?key={state.settings.gemini_api_key}",
-        json=payload,
-        timeout=state.settings.request_timeout_seconds,
-    )
-    response.raise_for_status()
-    data = response.json()
+    data = post_gemini_with_retry(state, payload, max_attempts=4, operation="query-clean")
     candidates = data.get("candidates", [])
     if not candidates:
         return "No answer could be generated from retrieved notes."
@@ -275,10 +383,6 @@ def generate_fallback_notes_answer(
     question: str,
     style: Literal["brief", "detailed", "bullets"] = "brief",
 ) -> str:
-    url = (
-        f"https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{state.settings.gemini_model}:generateContent"
-    )
     style_instructions = {
         "brief": "Respond in 3-5 concise sentences.",
         "detailed": "Respond with a well-structured detailed explanation.",
@@ -294,13 +398,7 @@ def generate_fallback_notes_answer(
         "contents": [{"parts": [{"text": f"Question:\n{question}"}]}],
         "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1024},
     }
-    response = requests.post(
-        f"{url}?key={state.settings.gemini_api_key}",
-        json=payload,
-        timeout=state.settings.request_timeout_seconds,
-    )
-    response.raise_for_status()
-    data = response.json()
+    data = post_gemini_with_retry(state, payload, max_attempts=4, operation="query-clean")
     candidates = data.get("candidates", [])
     if not candidates:
         return "No answer could be generated."
@@ -334,6 +432,32 @@ def get_ingestion_status(state: AppState, document_id: str) -> dict[str, Any]:
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     return doc
+
+
+def list_ingestions(state: AppState, limit: int = 50) -> list[dict[str, Any]]:
+    cursor = (
+        state.mongo_collection.find(
+            {},
+            {
+                "_id": 0,
+                "document_id": 1,
+                "document_name": 1,
+                "doc_type": 1,
+                "subject": 1,
+                "source_url": 1,
+                "status": 1,
+                "vector_count": 1,
+                "chunk_count": 1,
+                "question_count": 1,
+                "created_at": 1,
+                "updated_at": 1,
+            },
+        )
+        .sort([("updated_at", -1), ("created_at", -1)])
+        .limit(max(1, min(limit, 200)))
+    )
+
+    return [dict(item) for item in cursor]
 
 
 def ingest_document(state: AppState, payload: IngestRequest) -> IngestResponse:
@@ -408,84 +532,72 @@ def ingest_document(state: AppState, payload: IngestRequest) -> IngestResponse:
                         "metadata": sanitize_metadata(metadata),
                     }
                 )
+        
         else:
             qid = 0
-            for idx, chunk in enumerate(chunks):
-                chunk_text = normalize_text(chunk.page_content)
-                if not chunk_text:
+
+            full_questions = parse_questions_with_gemini(state, full_text)
+            if not full_questions:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Whole-paper parsing returned no questions. Try a clearer/selectable PDF or retry later.",
+                )
+
+            for question in full_questions:
+                question_text = normalize_text(str(question.get("question_text", "")))
+                if not question_text:
                     continue
-                questions = parse_questions_with_gemini(state, chunk_text)
-                for question in questions:
-                    question_text = normalize_text(str(question.get("question_text", "")))
-                    if not question_text:
-                        continue
-                    qid += 1
-                    question_count += 1
-                    metadata = {
-                        **base_metadata,
-                        "chunk_index": idx,
-                        "chunk_id": f"{document_id}:chunk:{idx}",
+
+                qid += 1
+                question_count += 1
+
+                chunk_index_value = -1
+                chunk_id_value = f"{document_id}:full"
+                parse_status = "parsed_full"
+
+                metadata = {
+                    **base_metadata,
+                    "chunk_index": chunk_index_value,
+                    "chunk_id": chunk_id_value,
+                    "question_id": f"{document_id}:q:{qid}",
+                    "question_number": str(question.get("question_number") or qid),
+                    "question_type": question.get("question_type", "unknown"),
+                    "marks": question.get("marks"),
+                    "section": question.get("section"),
+                    "difficulty_hint": question.get("difficulty_hint"),
+                    "parse_status": parse_status,
+                    "question_text_preview": question_text[:280],
+                }
+                vectors.append(
+                    {
+                        "id": f"{document_id}:q:{qid}",
+                        "text": question_text,
+                        "metadata": sanitize_metadata(metadata),
+                    }
+                )
+                question_documents.append(
+                    {
+                        "document_id": document_id,
+                        "document_name": document_name,
+                        "doc_type": payload.doc_type,
+                        "source_url": str(payload.source_url),
+                        "chunk_index": chunk_index_value,
+                        "chunk_id": chunk_id_value,
                         "question_id": f"{document_id}:q:{qid}",
                         "question_number": str(question.get("question_number") or qid),
+                        "question_text": question_text,
                         "question_type": question.get("question_type", "unknown"),
                         "marks": question.get("marks"),
                         "section": question.get("section"),
                         "difficulty_hint": question.get("difficulty_hint"),
-                        "parse_status": "parsed",
-                        "question_text_preview": question_text[:280],
+                        "subject": payload.subject,
+                        "course": payload.course,
+                        "tags": payload.tags,
+                        "text_hash": text_hash,
+                        "parse_status": parse_status,
+                        "created_at": now_iso(),
                     }
-                    vectors.append(
-                        {
-                            "id": f"{document_id}:q:{qid}",
-                            "text": question_text,
-                            "metadata": sanitize_metadata(metadata),
-                        }
-                    )
-                    question_documents.append(
-                        {
-                            "document_id": document_id,
-                            "document_name": document_name,
-                            "doc_type": payload.doc_type,
-                            "source_url": str(payload.source_url),
-                            "chunk_index": idx,
-                            "chunk_id": f"{document_id}:chunk:{idx}",
-                            "question_id": f"{document_id}:q:{qid}",
-                            "question_number": str(question.get("question_number") or qid),
-                            "question_text": question_text,
-                            "question_type": question.get("question_type", "unknown"),
-                            "marks": question.get("marks"),
-                            "section": question.get("section"),
-                            "difficulty_hint": question.get("difficulty_hint"),
-                            "subject": payload.subject,
-                            "course": payload.course,
-                            "tags": payload.tags,
-                            "text_hash": text_hash,
-                            "parse_status": "parsed",
-                            "created_at": now_iso(),
-                        }
-                    )
-
-            if not vectors:
-                texts = [normalize_text(chunk.page_content) for chunk in chunks]
-                fallback_embeddings = embed_texts(state, texts, "passage")
-                for idx, (chunk, embedding) in enumerate(
-                    zip(chunks, fallback_embeddings, strict=True)
-                ):
-                    chunk_text = normalize_text(chunk.page_content)
-                    metadata = {
-                        **base_metadata,
-                        "chunk_index": idx,
-                        "chunk_id": f"{document_id}:chunk:{idx}",
-                        "parse_status": "fallback_chunk",
-                        "chunk_text_preview": chunk_text[:280],
-                    }
-                    vectors.append(
-                        {
-                            "id": f"{document_id}:chunk:{idx}",
-                            "values": embedding,
-                            "metadata": sanitize_metadata(metadata),
-                        }
-                    )
+                )
 
             if vectors and "values" not in vectors[0]:
                 question_texts = [item["text"] for item in vectors]
@@ -559,12 +671,12 @@ def ingest_document(state: AppState, payload: IngestRequest) -> IngestResponse:
                 "$set": {
                     "status": "failed",
                     "updated_at": now_iso(),
-                    "last_error": str(exc),
+                    "last_error": internal_error_summary(exc),
                 }
             },
             upsert=True,
         )
-        raise HTTPException(status_code=500, detail=f"Ingestion failed: {exc}") from exc
+        raise map_ingest_exception(exc) from exc
 
 
 def query_vectors(state: AppState, payload: QueryRequest) -> QueryResponse:
@@ -597,102 +709,107 @@ def query_vectors(state: AppState, payload: QueryRequest) -> QueryResponse:
 
 
 def query_clean(state: AppState, payload: QueryRequest) -> QueryCleanResponse:
-    query_result = query_vectors(state, payload)
-    mode = payload.doc_type or "notes"
+    try:
+        query_result = query_vectors(state, payload)
+        mode = payload.doc_type or "notes"
 
-    if mode == "qpaper":
+        if mode == "qpaper":
+            if not query_result.matches:
+                return QueryCleanResponse(answer="No matching question found.")
+
+            top_match = query_result.matches[0]
+            question_id = top_match.metadata.get("question_id")
+            if not question_id:
+                return QueryCleanResponse(answer="No matching question found.")
+
+            question_doc = state.mongo_questions_collection.find_one(
+                {"question_id": question_id},
+                {"_id": 0, "question_text": 1},
+            )
+            if not question_doc or not question_doc.get("question_text"):
+                return QueryCleanResponse(answer="No full question text found for this match.")
+
+            return QueryCleanResponse(answer=str(question_doc["question_text"]))
+
         if not query_result.matches:
-            return QueryCleanResponse(answer="No matching question found.")
+            return QueryCleanResponse(
+                answer=generate_fallback_notes_answer(state, payload.query, payload.style),
+                used_gemini_fallback=True,
+            )
 
-        top_match = query_result.matches[0]
-        question_id = top_match.metadata.get("question_id")
-        if not question_id:
-            return QueryCleanResponse(answer="No matching question found.")
+        contexts: list[str] = []
+        seen_chunk_ids: set[str] = set()
+        notes_namespace = state.settings.pinecone_notes_namespace
 
-        question_doc = state.mongo_questions_collection.find_one(
-            {"question_id": question_id},
-            {"_id": 0, "question_text": 1},
-        )
-        if not question_doc or not question_doc.get("question_text"):
-            return QueryCleanResponse(answer="No full question text found for this match.")
-
-        return QueryCleanResponse(answer=str(question_doc["question_text"]))
-
-    if not query_result.matches:
-        return QueryCleanResponse(
-            answer=generate_fallback_notes_answer(state, payload.query, payload.style),
-            used_gemini_fallback=True,
-        )
-
-    contexts: list[str] = []
-    seen_chunk_ids: set[str] = set()
-    notes_namespace = state.settings.pinecone_notes_namespace
-
-    for match in query_result.matches[: payload.top_k]:
-        if float(match.score) < state.settings.clean_query_min_score:
-            continue
-
-        match_document_id = str(match.metadata.get("document_id") or "").strip()
-        chunk_index_raw = match.metadata.get("chunk_index")
-        try:
-            chunk_index = int(chunk_index_raw)
-        except (TypeError, ValueError):
-            chunk_index = None
-
-        candidate_chunks: list[tuple[str, str]] = []
-        direct_chunk_id = str(match.metadata.get("chunk_id") or "").strip()
-        if direct_chunk_id:
-            candidate_chunks.append((direct_chunk_id, notes_namespace))
-
-        if match_document_id and chunk_index is not None:
-            prev_idx = chunk_index - 1
-            next_idx = chunk_index + 1
-            if prev_idx >= 0:
-                candidate_chunks.append((f"{match_document_id}:chunk:{prev_idx}", notes_namespace))
-            candidate_chunks.append((f"{match_document_id}:chunk:{next_idx}", notes_namespace))
-
-        for chunk_id, namespace in candidate_chunks:
-            if chunk_id in seen_chunk_ids:
+        for match in query_result.matches[: payload.top_k]:
+            if float(match.score) < state.settings.clean_query_min_score:
                 continue
 
-            chunk_text = ""
+            match_document_id = str(match.metadata.get("document_id") or "").strip()
+            chunk_index_raw = match.metadata.get("chunk_index")
             try:
-                fetch_result = state.pinecone_index.fetch(ids=[chunk_id], namespace=namespace)
-                vectors = getattr(fetch_result, "vectors", {}) or {}
-                vector_item = vectors.get(chunk_id) if isinstance(vectors, dict) else None
-                if vector_item:
-                    vector_metadata = getattr(vector_item, "metadata", None)
-                    if vector_metadata is None and isinstance(vector_item, dict):
-                        vector_metadata = vector_item.get("metadata", {})
-                    vector_metadata = dict(vector_metadata or {})
+                chunk_index = int(chunk_index_raw)
+            except (TypeError, ValueError):
+                chunk_index = None
+
+            candidate_chunks: list[tuple[str, str]] = []
+            direct_chunk_id = str(match.metadata.get("chunk_id") or "").strip()
+            if direct_chunk_id:
+                candidate_chunks.append((direct_chunk_id, notes_namespace))
+
+            if match_document_id and chunk_index is not None:
+                prev_idx = chunk_index - 1
+                next_idx = chunk_index + 1
+                if prev_idx >= 0:
+                    candidate_chunks.append((f"{match_document_id}:chunk:{prev_idx}", notes_namespace))
+                candidate_chunks.append((f"{match_document_id}:chunk:{next_idx}", notes_namespace))
+
+            for chunk_id, namespace in candidate_chunks:
+                if chunk_id in seen_chunk_ids:
+                    continue
+
+                chunk_text = ""
+                try:
+                    fetch_result = state.pinecone_index.fetch(ids=[chunk_id], namespace=namespace)
+                    vectors = getattr(fetch_result, "vectors", {}) or {}
+                    vector_item = vectors.get(chunk_id) if isinstance(vectors, dict) else None
+                    if vector_item:
+                        vector_metadata = getattr(vector_item, "metadata", None)
+                        if vector_metadata is None and isinstance(vector_item, dict):
+                            vector_metadata = vector_item.get("metadata", {})
+                        vector_metadata = dict(vector_metadata or {})
+                        chunk_text = str(
+                            vector_metadata.get("chunk_text_preview")
+                            or vector_metadata.get("question_text_preview")
+                            or ""
+                        ).strip()
+                except Exception:
+                    chunk_text = ""
+
+                if not chunk_text and chunk_id == direct_chunk_id:
                     chunk_text = str(
-                        vector_metadata.get("chunk_text_preview")
-                        or vector_metadata.get("question_text_preview")
+                        match.metadata.get("chunk_text_preview")
+                        or match.metadata.get("question_text_preview")
+                        or match.text_preview
                         or ""
                     ).strip()
-            except Exception:
-                chunk_text = ""
 
-            if not chunk_text and chunk_id == direct_chunk_id:
-                chunk_text = str(
-                    match.metadata.get("chunk_text_preview")
-                    or match.metadata.get("question_text_preview")
-                    or match.text_preview
-                    or ""
-                ).strip()
+                if chunk_text:
+                    contexts.append(chunk_text)
+                    seen_chunk_ids.add(chunk_id)
 
-            if chunk_text:
-                contexts.append(chunk_text)
-                seen_chunk_ids.add(chunk_id)
+        if not contexts:
+            answer = generate_fallback_notes_answer(state, payload.query, payload.style)
+            used_fallback = True
+        else:
+            answer = generate_clean_notes_answer(state, payload.query, contexts, payload.style)
+            used_fallback = False
 
-    if not contexts:
-        answer = generate_fallback_notes_answer(state, payload.query, payload.style)
-        used_fallback = True
-    else:
-        answer = generate_clean_notes_answer(state, payload.query, contexts, payload.style)
-        used_fallback = False
-
-    return QueryCleanResponse(
-        answer=answer,
-        used_gemini_fallback=used_fallback,
-    )
+        return QueryCleanResponse(
+            answer=answer,
+            used_gemini_fallback=used_fallback,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise map_query_exception(exc) from exc
