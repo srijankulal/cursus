@@ -1,58 +1,98 @@
 import { NextResponse } from 'next/server';
+import { connectToDatabase } from '@/lib/mongoose'; 
+import { QPNote } from '@/models/qp_notes';
 
 export async function POST(request: Request) {
   try {
-    // 1. Get the form data from the incoming request
+    // 1. Get the form data safely
     const formData = await request.formData();
     const file = formData.get('file');
 
     if (!file || !(file instanceof File)) {
-      return NextResponse.json(
-        { error: 'No valid file provided' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'No valid file provided' }, { status: 400 });
     }
+    
+    // Safely extract with fallbacks to guarantee no nulls go to Mongoose
+    const uiType = formData.get('documentType') as string;
+    const documentType = uiType === 'notes' ? 'note' : 'question_paper'; // Ensuring enum matches
+
+    const subject = (formData.get('subject') as string) || 'General';
+    const semesterStr = formData.get('semester');
+    const semester = semesterStr ? parseInt(semesterStr as string, 10) : 1;
+    const department = (formData.get('department') as string) || 'CSE';
+    
+    // Using your real faculty ID
+    const facultyId = '69c130d23ce40c87ebffe47d'; 
 
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
     if (!cloudName || !uploadPreset) {
-      return NextResponse.json(
-        { error: 'Server configuration error: Missing Cloudinary credentials' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Missing Cloudinary credentials' }, { status: 500 });
     }
 
-    // 2. Prepare the payload for Cloudinary
+    // 2. Upload to Cloudinary
     const cloudinaryFormData = new FormData();
     cloudinaryFormData.append('file', file);
     cloudinaryFormData.append('upload_preset', uploadPreset);
 
-    // 3. Upload to Cloudinary
-    const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${cloudName}/upload`,
-      {
-        method: 'POST',
-        body: cloudinaryFormData,
-      }
-    );
+    const cloudinaryResponse = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/upload`, {
+      method: 'POST',
+      body: cloudinaryFormData,
+    });
 
-    const data = await response.json();
+    const cloudinaryData = await cloudinaryResponse.json();
 
-    if (!response.ok) {
+    if (!cloudinaryResponse.ok) {
       return NextResponse.json(
-        { error: data.error?.message || 'Failed to upload image' },
-        { status: response.status }
+        { error: cloudinaryData.error?.message || 'Failed to upload image to Cloudinary' },
+        { status: cloudinaryResponse.status }
       );
     }
 
-    // 4. Return the secure URL back to your frontend
-    return NextResponse.json({ url: data.secure_url }, { status: 200 });
+    // 3. Save to MongoDB 
+    try {
+      await connectToDatabase();
+      
+      const newNote = await QPNote.create({
+        url: cloudinaryData.secure_url,
+        type: documentType, 
+        subject: subject,
+        semester: semester,
+        department: department,
+        faculty: facultyId, 
+        facultyUploaded: true,
+        isApproved: false,
+        isVisible: true
+      });
 
-  } catch (error) {
-    console.error('Error uploading file:', error);
+      // 4. Return success 
+      return NextResponse.json({ 
+        success: true, 
+        url: cloudinaryData.secure_url,
+        note: newNote 
+      }, { status: 201 });
+
+    } catch (dbError: any) {
+      // Catch specific DB errors so they don't break the Next.js process
+      console.error('Database insertion error:', dbError);
+      return NextResponse.json(
+        { 
+          error: 'Database error', 
+          message: dbError?.message || String(dbError),
+          details: dbError?.errors || {} // Will output exact mongoose validation failures
+        },
+        { status: 500 }
+      );
+    }
+
+  } catch (error: any) {
+    console.error('Fatal API error:', error);
     return NextResponse.json(
-      { error: 'Internal server error during upload' },
+      { 
+        error: 'Critical server error', 
+        message: error?.message || String(error) 
+      },
       { status: 500 }
     );
   }
