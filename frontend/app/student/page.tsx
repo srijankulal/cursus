@@ -10,6 +10,7 @@ import { AskAI } from '@/components/student/AskAI';
 import { syllabus, type Semester } from '@/models/syllabus';
 import { ResourceViewer } from '@/components/student/ResourceViewer';
 import { storage } from '@/lib/storage';
+import { SyllabusManager } from '@/components/hod/SyllabusManager';
 
 interface StudentProfile {
   _id: string;
@@ -32,6 +33,7 @@ const TITLES: Record<string, { title: string; sub: string; hue: string }> = {
   'study-plan': { title: 'AI Study Plan',  sub: 'Let Gemini AI build a day-by-day plan based on what\'s left.', hue: 'bg-emerald-600' },
   resources:    { title: 'Study Materials',  sub: 'Download notes and past question papers uploaded by faculty.', hue: 'bg-cyan-500' },
   'ask-ai':     { title: 'Ask Gemini',      sub: 'Have a conversation with AI about specific BCA topics.', hue: 'bg-indigo-600' },
+  'syllabus-manager': { title: 'Syllabus Manager', sub: 'Add, edit, and organize syllabus content for your department.', hue: 'bg-amber-500' },
 };
 
 export default function StudentPage() {
@@ -88,6 +90,7 @@ useEffect(() => {
       case 'study-plan':  return <StudyPlan />;
       case 'resources':   return <ResourceViewer semester={profile?.semester || 1} />;
       case 'ask-ai':      return <AskAI />;
+      case 'syllabus-manager': return <SyllabusManager />;
       default:            return <Dashboard profile={profile} sem={sem} />;
     }
   };
