@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { syllabus, Topic } from '@/data/syllabus';
+import { useSyllabus, Topic } from '@/lib/hooks/use-syllabus';
 import { storage } from '@/lib/storage';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
@@ -12,23 +12,55 @@ import { cn } from '@/lib/utils';
 
 export const Syllabus = ({ activeSemesterId }: { activeSemesterId: string }) => {
   const [completed, setCompleted] = useState<string[]>([]);
-  const [openSubject, setOpenSubject] = useState<string | null>(syllabus[0].id);
-  const [openUnit, setOpenUnit] = useState<string | null>(null);
-  const sem = syllabus.find(s => s.id === activeSemesterId) ?? syllabus[0];
+  const { semester: sem, loading, error } = useSyllabus(6);
+  const [expandedSubjects, setExpandedSubjects] = useState<Set<string>>(new Set());
+  const [expandedUnits, setExpandedUnits] = useState<Set<string>>(new Set());
 
-  useEffect(() => { setCompleted(storage.getCompletedTopics()); }, []);
+  useEffect(() => { 
+    setCompleted(storage.getCompletedTopics()); 
+  }, []);
+
+  // Auto-open first subject
+useEffect(() => {
+  if (sem && sem.subjects.length > 0 && expandedSubjects.size === 0) {
+    setExpandedSubjects(new Set([sem.subjects[0].id]));
+  }
+}, [sem]);  // ← Only sem, not expandedSubjects
 
   const toggle = (id: string) => setCompleted(storage.toggleTopicCompletion(id));
 
+  const toggleSubject = (id: string) => {
+    const newSet = new Set(expandedSubjects);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setExpandedSubjects(newSet);
+  };
+
+  const toggleUnit = (id: string) => {
+    const newSet = new Set(expandedUnits);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setExpandedUnits(newSet);
+  };
+
   const pct = (topics: Topic[]) =>
     topics.length === 0 ? 0 : Math.round((topics.filter(t => completed.includes(t.id)).length / topics.length) * 100);
+
+  if (loading) return <div className="p-10 text-center animate-pulse text-app-muted uppercase tracking-[0.2em] font-bold">Loading Syllabus...</div>;
+  if (error || !sem) return <div className="p-10 text-center text-rose-500 font-bold uppercase tracking-[0.2em]">Error loading syllabus</div>;
 
   return (
     <div className="space-y-6 pb-60">
       {sem.subjects.map((subject, idx) => {
         const subTopics = subject.units.flatMap(u => u.topics);
         const progress = pct(subTopics);
-        const isOpen = openSubject === subject.id;
+        const isOpen = expandedSubjects.has(subject.id);
         const colorHues = [
           'from-blue-500 to-indigo-600',
           'from-amber-400 to-orange-500',
@@ -43,9 +75,9 @@ export const Syllabus = ({ activeSemesterId }: { activeSemesterId: string }) => 
             key={subject.id} 
             className="border border-slate-200 rounded-2xl sm:rounded-[2rem] bg-white shadow-premium overflow-visible transition-all duration-300"
           >
-            {/* Subject Trigger */}
             <button 
-              onClick={() => setOpenSubject(isOpen ? null : subject.id)}
+              type="button"
+              onClick={() => toggleSubject(subject.id)}
               className="w-full flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 px-4 sm:px-6 py-4 sm:py-6 hover:bg-slate-50/50 transition-colors text-left rounded-2xl sm:rounded-[2rem] group"
             >
               <div className="flex items-center gap-4 sm:gap-6 w-full">
@@ -84,16 +116,17 @@ export const Syllabus = ({ activeSemesterId }: { activeSemesterId: string }) => 
                   <div className="px-6 pb-8 pt-2 space-y-4 bg-slate-50/30 rounded-b-[2rem] border-t border-slate-100">
                     {subject.units.map(unit => {
                       const unitPct = pct(unit.topics);
-                      const isUnitOpen = openUnit === unit.id;
+                      const isUnitOpen = expandedUnits.has(unit.id);
 
                       return (
                         <div key={unit.id} className="border border-slate-200 rounded-2xl bg-white shadow-sm overflow-visible">
                           <button 
-                            onClick={(e) => { e.stopPropagation(); setOpenUnit(isUnitOpen ? null : unit.id); }}
+                            type="button"
+                            onClick={() => toggleUnit(unit.id)}
                             className="w-full flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors text-sm group rounded-2xl"
                           >
                             <Target size={17} className={cn('transition-colors duration-300', isUnitOpen ? 'text-indigo-600' : 'text-slate-400 group-hover:text-indigo-500')} />
-                            <span className="flex-1 text-left font-bold text-slate-800 tracking-tight">{unit.name}</span>
+                            <span className="flex-1 text-left font-bold text-slate-800 tracking-tight">{unit.unit_number}. {unit.name}</span>
                             <div className="flex items-center gap-3 shrink-0 mr-1">
                               <span className={cn("text-[10px] font-bold w-10 text-right uppercase tracking-tighter", unitPct === 100 ? 'text-emerald-600' : 'text-slate-400')}>
                                 {unitPct}%

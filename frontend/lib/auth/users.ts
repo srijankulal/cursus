@@ -9,6 +9,9 @@ interface SignupInput {
   email: string;
   password: string;
   role: string;
+  semester?: number | string;
+  rollNumber?: string;
+  classId?: string;
 }
 
 interface LoginInput {
@@ -42,6 +45,20 @@ export function validateSignupInput(input: SignupInput) {
     return { ok: false as const, message: 'Password must be at least 8 characters.' };
   }
 
+  const semesterValue = Number(input.semester);
+  const rollNumber = String(input.rollNumber ?? '').trim();
+  const classId = String(input.classId ?? '').trim();
+
+  if (role === 'students') {
+    if (!Number.isInteger(semesterValue) || semesterValue < 1 || semesterValue > 6) {
+      return { ok: false as const, message: 'Please provide a valid semester between 1 and 6.' };
+    }
+
+    if (!rollNumber) {
+      return { ok: false as const, message: 'Roll number is required for student signup.' };
+    }
+  }
+
   return {
     ok: true as const,
     data: {
@@ -49,6 +66,9 @@ export function validateSignupInput(input: SignupInput) {
       email,
       password,
       role,
+      semester: role === 'students' ? semesterValue : undefined,
+      rollNumber: role === 'students' ? rollNumber : undefined,
+      classId: role === 'students' && classId ? classId : undefined,
     },
   };
 }

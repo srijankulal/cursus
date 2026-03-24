@@ -13,6 +13,7 @@ export interface IStudent extends Document {
   examDate?: Date;
   profileImage?: string;
   isActive: boolean;
+  class?: Types.ObjectId;  // Reference to Class
   createdAt: Date;
   updatedAt: Date;
 }
@@ -29,6 +30,8 @@ const StudentSchema = new Schema<IStudent>(
     // examDate:        { type: Date },
     profileImage:    { type: String },
     isActive:        { type: Boolean, default: true },
+    class:           { type: Schema.Types.ObjectId, ref: "Class" },
+    
   },
   { timestamps: true }
 );

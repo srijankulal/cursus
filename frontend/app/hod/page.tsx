@@ -6,6 +6,7 @@ import { StatsRow } from '@/components/hod/StatsRow';
 import { SubjectChart } from '@/components/hod/SubjectChart';
 import { AtRiskTable } from '@/components/hod/AtRiskTable';
 import { ProgressChart } from '@/components/hod/ProgressChart';
+import { ClassManagement } from '@/components/hod/ClassManagement';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, LayoutDashboard, Users, GraduationCap, BarChart3, Settings, Upload } from 'lucide-react';
@@ -16,6 +17,7 @@ import Link from 'next/link';
 
 const tabs = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { id: 'classes', label: 'Classes', icon: GraduationCap },  
   { id: 'students', label: 'Student Directory', icon: Users },
   { id: 'subjects', label: 'Syllabus Coverage', icon: BarChart3 },
   { id: 'syllabus-config', label: 'Config Syllabus', icon: Settings },
@@ -64,6 +66,23 @@ export default function HODPage() {
         <nav className="flex-1 py-8 px-4 space-y-2">
           {tabs.map(t => {
             const isActive = tab === t.id;
+            const content = (
+              <>
+                <t.icon size={18} className={cn('shrink-0 transition-transform duration-300', isActive ? 'text-blue-400' : 'group-hover:scale-110')} />
+                <span className="text-xs font-bold tracking-widest uppercase">{t.label}</span>
+                {isActive && (
+                  <motion.div layoutId="hover" className="absolute right-3 w-1.5 h-1.5 bg-blue-400 rounded-full" />
+                )}
+              </>
+            );
+
+            const className = cn(
+              'w-full flex items-center px-4 h-12 rounded-xl transition-all duration-300 gap-4 group relative text-left',
+              isActive 
+                ? 'bg-white/10 text-white shadow-inner border border-white/10' 
+                : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            );
+
             return (
               <button
                 key={t.id}
@@ -71,18 +90,9 @@ export default function HODPage() {
                   setTab(t.id);
                   setIsMobileMenuOpen(false);
                 }}
-                className={cn(
-                  'w-full flex items-center px-4 h-12 rounded-xl transition-all duration-300 gap-4 group relative',
-                  isActive 
-                    ? 'bg-white/10 text-white shadow-inner border border-white/10' 
-                    : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                )}
+                className={className}
               >
-                <t.icon size={18} className={cn('shrink-0 transition-transform duration-300', isActive ? 'text-blue-400' : 'group-hover:scale-110')} />
-                <span className="text-xs font-bold tracking-widest uppercase">{t.label}</span>
-                {isActive && (
-                  <motion.div layoutId="hover" className="absolute right-3 w-1.5 h-1.5 bg-blue-400 rounded-full" />
-                )}
+                {content}
               </button>
             );
           })}

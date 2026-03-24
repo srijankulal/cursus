@@ -24,7 +24,7 @@ const CustomTooltip = ({ active, payload }: any) => {
 
 export const SubjectChart = () => (
   <div className="h-[300px] w-full mt-4">
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={280}>
       <BarChart data={data} margin={{ top: 0, right: 30, left: -20, bottom: 0 }}>
         <XAxis 
           dataKey="name" 
@@ -33,7 +33,7 @@ export const SubjectChart = () => (
           tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b', transform: 'translate(0, 5)' }}
         />
         <YAxis hide />
-        <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc', radius: [12, 12, 0, 0] }} />
+        <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc', rx: 12, ry: 12 }} />
         <Bar 
           dataKey="completion" 
           radius={[10, 10, 10, 10]} 

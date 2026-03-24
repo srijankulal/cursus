@@ -11,6 +11,21 @@ import { syllabus, type Semester } from '@/models/syllabus';
 import { ResourceViewer } from '@/components/student/ResourceViewer';
 import { storage } from '@/lib/storage';
 
+interface StudentProfile {
+  _id: string;
+  name: string;
+  email: string;
+  department: string;
+  semester: number;
+  rollNumber: string;
+  class: {
+    _id: string;
+    name: string;
+    semester: number;
+    department: string;
+  } | null;
+}
+
 const TITLES: Record<string, { title: string; sub: string; hue: string }> = {
   dashboard:    { title: 'Overview',   sub: 'Your risk status and recent progress at a glance.', hue: 'bg-blue-600' },
   syllabus:     { title: 'Syllabus Explorer',    sub: 'Browse topics, mark them done, and identify high-yield areas.', hue: 'bg-amber-500' },
@@ -21,27 +36,59 @@ const TITLES: Record<string, { title: string; sub: string; hue: string }> = {
 
 export default function StudentPage() {
   const [tab, setTab] = useState('dashboard');
-  const [progress, setProgress] = useState(0);
+  const [loading, setLoading] = useState(true);
+const [error, setError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const sem = syllabus[0];
+  const [profile, setProfile] = useState<StudentProfile | null>(null);
+  const sem: Semester = profile?.semester
+    ? syllabus.find((item) => item.id === `sem${profile.semester}`) ?? syllabus[0]
+    : syllabus[0];
 
-  useEffect(() => {
-    const done = storage.getCompletedTopics().length;
-    const total = sem.subjects.flatMap(s => s.units.flatMap(u => u.topics)).length;
-    setProgress(Math.round((done / total) * 100));
-  }, [tab]);
+  const done = storage.getCompletedTopics().length;
+  const total = sem.subjects.flatMap(s => s.units.flatMap(u => u.topics)).length;
+  const progress = Math.round((done / total) * 100);
+
+useEffect(() => {
+  async function loadProfile() {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/student/profile', { cache: 'no-store' });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data?.message ?? 'Failed to load profile');
+        return;
+      }
+
+      if (data.profile) {
+        setProfile(data.profile as StudentProfile);
+      }
+    } catch {
+      setError('Failed to load profile');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  void loadProfile();
+}, []);
 
   const page = TITLES[tab] ?? TITLES.dashboard;
 
   const renderContent = () => {
+    if (loading) return <div className="p-10 text-center animate-pulse text-app-muted uppercase tracking-[0.2em] font-bold">Loading Workspace...</div>;
+    if (error || !sem) return <div className="p-10 text-center text-rose-500 font-bold uppercase tracking-[0.2em]">Error loading workspace</div>;
+
     switch (tab) {
-      case 'dashboard':   return <Dashboard />;
+      case 'dashboard':   return <Dashboard profile={profile} sem={sem} />;
       case 'syllabus':    return <Syllabus activeSemesterId={sem.id} />;
       case 'study-plan':  return <StudyPlan />;
       case 'resources':   return <ResourceViewer semester={profile?.semester || 1} />;
       case 'ask-ai':      return <AskAI />;
-      default:            return <Dashboard />;
+      default:            return <Dashboard profile={profile} sem={sem} />;
     }
   };
 
@@ -53,7 +100,7 @@ export default function StudentPage() {
           setTab(t);
           setIsMobileMenuOpen(false);
         }}
-        semesterName={sem.name}
+        semesterName={profile ? `Semester ${profile.semester}` : sem.name}
         progress={progress}
         collapsed={collapsed}
         setCollapsed={setCollapsed}
@@ -94,15 +141,11 @@ export default function StudentPage() {
               </AnimatePresence>
             </div>
             
-            <div className="flex -space-x-2 shrink-0">
-               {[1, 2].map(i => (
-                 <div key={i} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-white bg-neutral-100 flex items-center justify-center text-[10px] font-bold text-neutral-400">
-                   {i}
-                 </div>
-               ))}
-               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-white bg-neutral-900 flex items-center justify-center text-[10px] font-bold text-white">
-                 +
-               </div>
+            <div className="shrink-0 rounded-xl border border-app-border bg-white px-3 py-2 text-right shadow-sm">
+              <p className="text-[11px] font-bold text-neutral-900">{profile?.name ?? 'Student'}</p>
+              <p className="text-[10px] font-medium text-app-muted">
+                {profile?.rollNumber ? `Roll: ${profile.rollNumber}` : 'Roll number not set'}
+              </p>
             </div>
           </header>
 
@@ -128,6 +171,6 @@ export default function StudentPage() {
   );
 }
 
-function cn(...inputs: any[]) {
+function cn(...inputs: Array<string | false | null | undefined>) {
   return inputs.filter(Boolean).join(' ');
 }
