@@ -55,7 +55,10 @@ export async function POST(request: Request) {
         { ok: false, message: 'User already exists for this role.' },
         { status: 409 }
       );
+      
     }
+
+
 
     return NextResponse.json(
       { ok: false, message: 'Unable to create account right now.' },
