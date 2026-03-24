@@ -1,12 +1,27 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { storage } from '@/lib/storage';
-import { syllabus, EXAM_DATE_DEFAULT } from '@/models/syllabus';
+import { EXAM_DATE_DEFAULT, type Semester } from '@/models/syllabus';
 import { calculateRisk, RiskStatus } from '@/lib/riskCalculator';
 import { cn } from '@/lib/utils';
-import { CheckCircle2, Target, Clock, TrendingUp, Flame, BookMarked, Zap, CalendarDays } from 'lucide-react';
+import { CheckCircle2, Target, Clock, TrendingUp, BookMarked, Zap, CalendarDays } from 'lucide-react';
+
+interface StudentProfile {
+  _id: string;
+  name: string;
+  email: string;
+  department: string;
+  semester: number;
+  rollNumber: string;
+  class: {
+    _id: string;
+    name: string;
+    semester: number;
+    department: string;
+  } | null;
+}
 
 const riskMap = {
   green: {
@@ -31,7 +46,19 @@ const riskMap = {
   },
 } as const;
 
-function StatCard({ icon: Icon, label, value, color, delay }: { icon: any, label: string, value: string | number, color: string, delay: number }) {
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  color,
+  delay,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string | number;
+  color: string;
+  delay: number;
+}) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 15 }}
@@ -51,37 +78,56 @@ function StatCard({ icon: Icon, label, value, color, delay }: { icon: any, label
   );
 }
 
-export const Dashboard = () => {
-  const [status, setStatus] = useState<RiskStatus | null>(null);
-  const [recentTopics, setRecentTopics] = useState<string[]>([]);
-
-  const sem = syllabus[0];
+export const Dashboard = ({ profile, sem }: { profile: StudentProfile | null; sem: Semester }) => {
   const allTopics = sem.subjects.flatMap(s => s.units.flatMap(u => u.topics));
   const allHY = allTopics.filter(t => t.isHighYield);
 
-  useEffect(() => {
-    const ids = storage.getCompletedTopics();
-    const examDate = storage.getExamDate() || EXAM_DATE_DEFAULT;
-    setStatus(calculateRisk(allTopics.length, ids.length, examDate));
-    setRecentTopics(
-      [...ids].reverse().slice(0, 5).map(id => allTopics.find(t => t.id === id)?.name ?? id)
-    );
-  }, []);
-
-  if (!status) return null;
+  const completedIds = storage.getCompletedTopics();
+  const examDate = storage.getExamDate() || EXAM_DATE_DEFAULT;
+  const status: RiskStatus = calculateRisk(allTopics.length, completedIds.length, examDate);
+  const recentTopics = [...completedIds]
+    .reverse()
+    .slice(0, 5)
+    .map((id) => allTopics.find((topic) => topic.id === id)?.name ?? id);
 
   const risk = riskMap[status.riskLevel];
-  const completedIds = storage.getCompletedTopics();
   const hyLeft = allHY.length - completedIds.filter(id => allHY.some(t => t.id === id)).length;
 
   return (
     <div className="space-y-10 pb-10">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="rounded-2xl border border-app-border bg-white p-5 shadow-premium"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-app-muted">Student Profile</p>
+            <h3 className="mt-1 text-xl font-bold tracking-tight text-neutral-900">
+              {profile?.name ?? 'Student'}
+            </h3>
+            <p className="text-sm text-app-muted">{profile?.email ?? 'No email available'}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <span className="rounded-lg border border-app-border bg-neutral-50 px-3 py-1.5 text-xs font-semibold text-neutral-700">
+              Roll No: {profile?.rollNumber ?? 'Not set'}
+            </span>
+            <span className="rounded-lg border border-app-border bg-neutral-50 px-3 py-1.5 text-xs font-semibold text-neutral-700">
+              Semester: {profile?.semester ?? '-'}
+            </span>
+            <span className="rounded-lg border border-app-border bg-neutral-50 px-3 py-1.5 text-xs font-semibold text-neutral-700">
+              Class: {profile?.class?.name ?? 'Not assigned'}
+            </span>
+          </div>
+        </div>
+      </motion.div>
+
       {/* Risk Banner - Vibrant Full Color Gradient */}
       <motion.div
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
         className={cn(
-          'p-5 sm:p-8 rounded-2xl sm:rounded-3xl border bg-gradient-to-br shadow-premium relative overflow-hidden group',
+          'p-5 sm:p-8 rounded-2xl sm:rounded-3xl border bg-linear-to-br shadow-premium relative overflow-hidden group',
           risk.bg, risk.border, risk.text
         )}
       >
@@ -198,7 +244,7 @@ export const Dashboard = () => {
         {/* Right Column - Recent Activity */}
         <div className="lg:col-span-5 flex flex-col pt-0">
           <h3 className="text-[11px] font-bold text-app-muted uppercase tracking-[0.2em] mb-6 ml-1">Recent Progress</h3>
-          <div className="flex-1 rounded-3xl border border-app-border bg-white shadow-premium overflow-hidden flex flex-col min-h-[400px]">
+          <div className="flex-1 rounded-3xl border border-app-border bg-white shadow-premium overflow-hidden flex flex-col min-h-100">
             <div className="p-5 bg-neutral-50 border-b border-app-border flex items-center justify-between">
                <span className="text-[10px] font-bold text-app-muted uppercase tracking-widest">Marked Topic</span>
                <span className="text-[10px] font-bold text-app-muted uppercase tracking-widest">Status</span>

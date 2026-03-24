@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Home, BookOpen, Calendar, MessageSquare, PanelLeftClose, PanelLeftOpen, GraduationCap, Sparkles } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
-import Link from 'next/link';
 
 interface SidebarProps {
   activeTab: string;
@@ -58,7 +57,7 @@ export const Sidebar = ({
       <div className="flex flex-col h-full overflow-hidden">
         {/* Brand Header */}
         <div className={cn(
-          'flex items-center h-[72px] border-b border-slate-200 shrink-0 px-4 transition-all',
+          'flex items-center h-18 border-b border-slate-200 shrink-0 px-4 transition-all',
           collapsed ? 'justify-center' : 'gap-4'
         )}>
           {collapsed ? (
@@ -72,9 +71,7 @@ export const Sidebar = ({
           ) : (
             <>
               <div className="w-10 h-10 bg-slate-950 rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-slate-900/10 transition-transform active:scale-95 cursor-pointer">
-              <Link href="/" className="flex items-center gap-1">
                 <span className="text-white text-sm font-black leading-none uppercase">C</span>
-              </Link>
               </div>
               <motion.span
                 initial={{ opacity: 0, x: -8 }}
@@ -163,7 +160,7 @@ export const Sidebar = ({
             <div className="flex justify-between items-end">
               <div className="flex flex-col">
                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest opacity-80">Full Mastery</span>
-                 <span className="text-xs font-black text-slate-900 mt-0.5 tracking-tighter">BCA Syllabus</span>
+                  <span className="text-xs font-black text-slate-900 mt-0.5 tracking-tighter">{semesterName}</span>
               </div>
               <div className="flex flex-col items-end">
                  <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100 shadow-sm">{progress}%</span>
