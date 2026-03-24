@@ -1,10 +1,14 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type IngestResult = {
   document_id: string;
@@ -19,6 +23,12 @@ type QuestionHit = {
   metadata: {
     question_number?: string;
   };
+};
+
+type UploadedDocument = {
+  document_id: string;
+  document_name?: string;
+  doc_type?: 'notes' | 'qpaper';
 };
 
 type AnswerMode = 'notes' | 'gemini';
@@ -41,17 +51,108 @@ export default function QuestionPaperPage() {
   const [answerMode, setAnswerMode] = useState<AnswerMode>('notes');
   const [answer, setAnswer] = useState('');
 
-  const canUseNotes = Boolean(notesResult?.document_id);
+  const [uploadedQpapers, setUploadedQpapers] = useState<UploadedDocument[]>([]);
+  const [selectedQpaperId, setSelectedQpaperId] = useState('');
+  const [selectedNotesId, setSelectedNotesId] = useState('');
+  const [loadingQpaperList, setLoadingQpaperList] = useState(false);
+  const [qpaperListError, setQpaperListError] = useState<string | null>(null);
+
+  const canUseNotes = Boolean(notesResult?.document_id || selectedNotesId);
+  const hasActiveQpaper = Boolean(qpaperResult?.document_id || selectedQpaperId);
 
   const workflowSteps = useMemo(
     () => [
-      { id: 1, label: 'Ingest Question Paper PDF', done: Boolean(qpaperResult?.document_id) },
+      { id: 1, label: 'Ingest or Select Question Paper', done: hasActiveQpaper },
       { id: 2, label: 'Extract Questions', done: questions.length > 0 },
-      { id: 3, label: 'Optional: Ingest Notes PDF', done: Boolean(notesResult?.document_id) },
+      { id: 3, label: 'Optional: Ingest or Select Notes PDF', done: Boolean(notesResult?.document_id || selectedNotesId) },
       { id: 4, label: 'Answer Questions (Notes or Gemini)', done: Boolean(answer.trim()) },
     ],
-    [qpaperResult, questions.length, notesResult, answer]
+    [hasActiveQpaper, questions.length, notesResult, selectedNotesId, answer]
   );
+
+  const qpaperOptions = useMemo(
+    () => uploadedQpapers.filter((item) => item.doc_type === 'qpaper'),
+    [uploadedQpapers]
+  );
+
+  const notesOptions = useMemo(
+    () => uploadedQpapers.filter((item) => item.doc_type === 'notes'),
+    [uploadedQpapers]
+  );
+
+  useEffect(() => {
+    void loadQpaperList();
+  }, []);
+
+  function questionNumberSortValue(raw?: string) {
+    const normalized = (raw ?? '').trim().toLowerCase().replace(/^q\s*/, '');
+    const numberMatch = normalized.match(/^(\d+)/);
+    const number = numberMatch ? Number.parseInt(numberMatch[1], 10) : Number.POSITIVE_INFINITY;
+    const suffix = numberMatch ? normalized.slice(numberMatch[1].length).trim() : normalized;
+    return { number, suffix };
+  }
+
+  function sortQuestions(hits: QuestionHit[]) {
+    return [...hits].sort((left, right) => {
+      const leftSort = questionNumberSortValue(left.metadata?.question_number);
+      const rightSort = questionNumberSortValue(right.metadata?.question_number);
+
+      if (leftSort.number !== rightSort.number) {
+        return leftSort.number - rightSort.number;
+      }
+
+      if (leftSort.suffix !== rightSort.suffix) {
+        return leftSort.suffix.localeCompare(rightSort.suffix);
+      }
+
+      return left.text_preview.localeCompare(right.text_preview);
+    });
+  }
+
+  async function loadQpaperList(preferredQpaperId?: string, preferredNotesId?: string) {
+    setLoadingQpaperList(true);
+    setQpaperListError(null);
+
+    try {
+      const response = await fetch('/api/rag/ingest', { method: 'GET', cache: 'no-store' });
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        setQpaperListError(data.message ?? 'Failed to load uploaded question papers.');
+        return;
+      }
+
+      const incomingDocs: UploadedDocument[] = Array.isArray(data.documents) ? data.documents : [];
+      const qpapers = incomingDocs.filter((item) => item.doc_type === 'qpaper');
+      const notes = incomingDocs.filter((item) => item.doc_type === 'notes');
+      setUploadedQpapers(incomingDocs);
+
+      if (preferredQpaperId) {
+        setSelectedQpaperId(preferredQpaperId);
+      } else if (!selectedQpaperId && qpapers.length > 0) {
+        setSelectedQpaperId(qpapers[0].document_id);
+      }
+
+      if (preferredNotesId) {
+        setSelectedNotesId(preferredNotesId);
+      } else if (!selectedNotesId && notes.length > 0) {
+        setSelectedNotesId(notes[0].document_id);
+      }
+    } catch {
+      setQpaperListError('Unable to load uploaded question papers right now.');
+    } finally {
+      setLoadingQpaperList(false);
+    }
+  }
+
+  async function handleSelectQpaper(documentId: string) {
+    setSelectedQpaperId(documentId);
+    setQpaperResult(null);
+    setError(null);
+    setAnswer('');
+    setSelectedQuestion('');
+    await fetchQuestions(documentId);
+  }
 
   async function ingestQuestionPaper(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -79,6 +180,8 @@ export default function QuestionPaperPage() {
       }
 
       setQpaperResult(data);
+      setSelectedQpaperId(data.document_id);
+      await loadQpaperList(data.document_id, selectedNotesId || undefined);
       await fetchQuestions(data.document_id);
     } catch {
       setError('Unable to ingest question paper right now.');
@@ -111,6 +214,8 @@ export default function QuestionPaperPage() {
       }
 
       setNotesResult(data);
+      setSelectedNotesId(data.document_id);
+      await loadQpaperList(selectedQpaperId || undefined, data.document_id);
     } catch {
       setError('Unable to ingest notes right now.');
     } finally {
@@ -140,9 +245,10 @@ export default function QuestionPaperPage() {
       }
 
       const hits: QuestionHit[] = (data.matches ?? []) as QuestionHit[];
-      setQuestions(hits);
-      if (hits.length > 0) {
-        setSelectedQuestion(hits[0].text_preview);
+      const sortedHits = sortQuestions(hits);
+      setQuestions(sortedHits);
+      if (sortedHits.length > 0) {
+        setSelectedQuestion(sortedHits[0].text_preview);
       }
     } catch {
       setError('Unable to fetch questions right now.');
@@ -164,8 +270,11 @@ export default function QuestionPaperPage() {
       style: 'detailed',
     };
 
-    if (answerMode === 'notes' && notesResult?.document_id) {
-      requestBody.document_id = notesResult.document_id;
+    if (answerMode === 'notes') {
+      const activeNotesDocumentId = notesResult?.document_id || selectedNotesId;
+      if (activeNotesDocumentId) {
+        requestBody.document_id = activeNotesDocumentId;
+      }
     }
 
     if (answerMode === 'gemini') {
@@ -195,6 +304,11 @@ export default function QuestionPaperPage() {
 
   return (
     <main className="min-h-screen bg-app-bg px-4 py-8 sm:px-6">
+      <div className="mx-auto mb-4 flex w-full max-w-7xl justify-end">
+        <Button asChild variant="outline" size="sm">
+          <Link href="/student">Go to Student</Link>
+        </Button>
+      </div>
       <div className="mx-auto grid w-full max-w-7xl gap-6 lg:grid-cols-[360px_1fr]">
         <Card className="border border-app-border bg-white">
           <CardHeader>
@@ -214,6 +328,49 @@ export default function QuestionPaperPage() {
               </div>
             ))}
 
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-app-text">Uploaded Question Papers</label>
+              <Select
+                value={selectedQpaperId}
+                onValueChange={(value) => {
+                  void handleSelectQpaper(value);
+                }}
+                disabled={loadingQpaperList || qpaperOptions.length === 0}
+              >
+                <SelectTrigger className="w-full h-10">
+                  <SelectValue
+                    placeholder={
+                      loadingQpaperList
+                        ? 'Loading uploaded question papers...'
+                        : qpaperOptions.length === 0
+                          ? 'No uploaded question papers found yet'
+                          : 'Select uploaded question paper'
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {qpaperOptions.map((item) => (
+                    <SelectItem key={item.document_id} value={item.document_id}>
+                      {(item.document_name || item.document_id).slice(0, 56)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {qpaperListError && <p className="text-xs text-red-600">{qpaperListError}</p>}
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                void loadQpaperList(selectedQpaperId || undefined, selectedNotesId || undefined);
+              }}
+              disabled={loadingQpaperList}
+            >
+              {loadingQpaperList ? 'Refreshing...' : 'Refresh Uploaded Documents'}
+            </Button>
+
             <form onSubmit={ingestQuestionPaper} className="space-y-2 pt-2">
               <label className="text-sm font-medium text-app-text">Question Paper PDF URL</label>
               <Input
@@ -232,6 +389,38 @@ export default function QuestionPaperPage() {
             </form>
 
             <form onSubmit={ingestNotes} className="space-y-2">
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-app-text">Uploaded Notes</label>
+                <Select
+                  value={selectedNotesId}
+                  onValueChange={(value) => {
+                    setSelectedNotesId(value);
+                    setNotesResult(null);
+                    setAnswer('');
+                  }}
+                  disabled={loadingQpaperList || notesOptions.length === 0}
+                >
+                  <SelectTrigger className="w-full h-10">
+                    <SelectValue
+                      placeholder={
+                        loadingQpaperList
+                          ? 'Loading uploaded notes...'
+                          : notesOptions.length === 0
+                            ? 'No uploaded notes found yet'
+                            : 'Select uploaded notes'
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {notesOptions.map((item) => (
+                      <SelectItem key={item.document_id} value={item.document_id}>
+                        {(item.document_name || item.document_id).slice(0, 56)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <label className="text-sm font-medium text-app-text">Notes PDF URL (optional)</label>
               <Input
                 placeholder="https://example.com/notes.pdf"
@@ -257,6 +446,12 @@ export default function QuestionPaperPage() {
             {notesResult && (
               <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
                 Notes ready for RAG answers.
+              </p>
+            )}
+
+            {selectedNotesId && !notesResult && (
+              <p className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+                Using existing uploaded notes.
               </p>
             )}
 
@@ -358,7 +553,28 @@ export default function QuestionPaperPage() {
 
               <div className="rounded-lg border border-app-border bg-neutral-50 p-3">
                 {answer ? (
-                  <p className="whitespace-pre-wrap text-sm text-app-text">{answer}</p>
+                  <div className="text-sm text-app-text">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                        ul: ({ children }) => <ul className="mb-2 list-disc pl-5 last:mb-0">{children}</ul>,
+                        ol: ({ children }) => <ol className="mb-2 list-decimal pl-5 last:mb-0">{children}</ol>,
+                        li: ({ children }) => <li className="mb-1 last:mb-0">{children}</li>,
+                        strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                        code: ({ children }) => (
+                          <code className="rounded bg-white px-1 py-0.5 text-[0.9em]">{children}</code>
+                        ),
+                        pre: ({ children }) => (
+                          <pre className="mb-2 overflow-x-auto rounded bg-white p-2 text-[0.9em] last:mb-0">
+                            {children}
+                          </pre>
+                        ),
+                      }}
+                    >
+                      {answer}
+                    </ReactMarkdown>
+                  </div>
                 ) : (
                   <p className="text-sm text-app-muted">Answer will appear here.</p>
                 )}

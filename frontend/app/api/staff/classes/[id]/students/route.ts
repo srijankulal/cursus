@@ -33,7 +33,7 @@ async function getClassGuideClass(userId: string, classId: string) {
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const cookieStore = await cookies();
@@ -48,7 +48,7 @@ export async function GET(
       return NextResponse.json({ ok: false, message: 'Missing authenticated user id.' }, { status: 401 });
     }
 
-    const { id } = await Promise.resolve(params);
+    const { id } = await context.params;
 
     await connectToDatabase();
 
@@ -92,7 +92,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const cookieStore = await cookies();
@@ -107,7 +107,7 @@ export async function POST(
       return NextResponse.json({ ok: false, message: 'Missing authenticated user id.' }, { status: 401 });
     }
 
-    const { id } = await Promise.resolve(params);
+    const { id } = await context.params;
     const body = await request.json();
     const rollNumber = String(body?.rollNumber ?? '').trim();
 

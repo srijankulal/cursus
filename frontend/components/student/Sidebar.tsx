@@ -1,9 +1,10 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, BookOpen, Calendar, MessageSquare, PanelLeftClose, PanelLeftOpen, GraduationCap, Sparkles } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
+import { Home, BookOpen, Calendar, MessageSquare, PanelLeftClose, PanelLeftOpen, GraduationCap, Sparkles,FileText } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';  
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 interface SidebarProps {
   activeTab: string;
@@ -20,6 +21,7 @@ const tabs = [
   { id: 'dashboard',  label: 'Dashboard',  icon: Home,       hue: 'hover:text-blue-500 hover:bg-blue-50/50', active: 'bg-blue-600 text-white shadow-blue-500/20 shadow-lg' },
   { id: 'syllabus',   label: 'Syllabus',    icon: BookOpen,   hue: 'hover:text-amber-500 hover:bg-amber-50/50',  active: 'bg-amber-500 text-white shadow-amber-500/20 shadow-lg' },
   { id: 'study-plan', label: 'Study Plan',  icon: Calendar,   hue: 'hover:text-emerald-500 hover:bg-emerald-50/50', active: 'bg-emerald-600 text-white shadow-emerald-500/20 shadow-lg' },
+  { id: 'resources',  label: 'Resources',   icon: FileText,   hue: 'hover:text-cyan-500 hover:bg-cyan-50/50', active: 'bg-cyan-600 text-white shadow-cyan-500/20 shadow-lg' },
   { id: 'ask-ai',     label: 'Ask AI',      icon: MessageSquare, hue: 'hover:text-indigo-500 hover:bg-indigo-50/50', active: 'bg-indigo-600 text-white shadow-indigo-500/20 shadow-lg' },
 ];
 
@@ -71,7 +73,9 @@ export const Sidebar = ({
           ) : (
             <>
               <div className="w-10 h-10 bg-slate-950 rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-slate-900/10 transition-transform active:scale-95 cursor-pointer">
+              <Link href="/" className="flex items-center gap-2">
                 <span className="text-white text-sm font-black leading-none uppercase">C</span>
+              </Link>
               </div>
               <motion.span
                 initial={{ opacity: 0, x: -8 }}

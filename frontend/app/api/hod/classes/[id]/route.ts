@@ -40,7 +40,7 @@ async function getCurrentHOD(request: NextRequest) {
 // PUT - Update a class
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const hod = await getCurrentHOD(request);
@@ -52,7 +52,7 @@ export async function PUT(
       );
     }
 
-    const { id } = await Promise.resolve(params);
+const { id } = await context.params;
     const body = await request.json();
     const { name, semester, capacity, classGuide, faculties, courseAssignments } = body;
 
@@ -137,7 +137,7 @@ export async function PUT(
 // DELETE - Delete a class
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+    context: { params: Promise<{ id: string }> }
 ) {
   try {
     const hod = await getCurrentHOD(request);
@@ -149,7 +149,7 @@ export async function DELETE(
       );
     }
 
-    const { id } = await Promise.resolve(params);
+    const { id } = await context.params;
 
     await connectToDatabase();
 

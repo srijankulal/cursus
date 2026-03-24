@@ -1,0 +1,43 @@
+services:
+  - type: web
+    name: cursus-backend
+    runtime: python
+    plan: free
+    rootDir: .
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB_NAME
+        value: cursus
+      - key: MONGODB_DOCUMENTS_COLLECTION
+        value: rag_documents
+      - key: MONGODB_QUESTIONS_COLLECTION
+        value: qpaper_questions
+      - key: PINECONE_API_KEY
+        sync: false
+      - key: PINECONE_INDEX_NAME
+        sync: false
+      - key: PINECONE_EMBEDDING_MODEL
+        value: llama-text-embed-v2
+      - key: PINECONE_BATCH_SIZE
+        value: "50"
+      - key: PINECONE_NOTES_NAMESPACE
+        value: notes
+      - key: PINECONE_QPAPER_NAMESPACE
+        value: qpaper
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3-flash-preview
+      - key: CHUNK_SIZE
+        value: "1200"
+      - key: CHUNK_OVERLAP
+        value: "200"
+      - key: REQUEST_TIMEOUT_SECONDS
+        value: "45"
+      - key: CLEAN_QUERY_MIN_SCORE
+        value: "0.2"

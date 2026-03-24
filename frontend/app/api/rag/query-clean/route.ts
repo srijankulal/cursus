@@ -8,10 +8,18 @@ export async function POST(request: Request) {
     const { response, data } = await ragPost('/query-clean', payload);
 
     if (!response.ok) {
+      const detail = data?.detail;
+      const detailMessage =
+        typeof detail === 'string'
+          ? detail
+          : typeof detail?.message === 'string'
+            ? detail.message
+            : null;
+
       return NextResponse.json(
         {
           ok: false,
-          message: data?.detail || data?.message || 'Clean query failed.',
+          message: detailMessage || data?.message || 'Clean query failed.',
           detail: data,
         },
         { status: response.status }

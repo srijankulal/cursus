@@ -4,149 +4,455 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { generateStudyPlan, StudyPlanItem } from '@/lib/gemini';
 import { useSyllabus } from '@/lib/hooks/use-syllabus';
-import { storage } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Sparkles, Calendar, Target, TrendingUp, PartyPopper, Clock, CheckCircle2, FlaskConical } from 'lucide-react';
+import {
+  Sparkles, Calendar, TrendingUp, PartyPopper,
+  BookOpen, Zap, Clock, ChevronRight, Star
+} from 'lucide-react';
+
+type StudyPlanWeek = {
+  month: number;
+  week: number;
+  startDate: string;
+  endDate: string;
+  focus: string;
+  topics: {
+    subject: string;
+    unit: string;
+    topic: string;
+    isHighYield: boolean;
+  }[];
+};
+
+// Soft color palette per subject (cycles through)
+const SUBJECT_PALETTES = [
+  { bg: 'bg-violet-50', border: 'border-violet-200', badge: 'bg-violet-100 text-violet-700', dot: 'bg-violet-500', accent: 'text-violet-600' },
+  { bg: 'bg-sky-50',    border: 'border-sky-200',    badge: 'bg-sky-100 text-sky-700',       dot: 'bg-sky-500',    accent: 'text-sky-600' },
+  { bg: 'bg-amber-50',  border: 'border-amber-200',  badge: 'bg-amber-100 text-amber-700',   dot: 'bg-amber-500',  accent: 'text-amber-600' },
+  { bg: 'bg-emerald-50',border: 'border-emerald-200',badge: 'bg-emerald-100 text-emerald-700',dot:'bg-emerald-500',accent: 'text-emerald-600' },
+  { bg: 'bg-rose-50',   border: 'border-rose-200',   badge: 'bg-rose-100 text-rose-700',     dot: 'bg-rose-500',   accent: 'text-rose-600' },
+  { bg: 'bg-indigo-50', border: 'border-indigo-200', badge: 'bg-indigo-100 text-indigo-700', dot: 'bg-indigo-500', accent: 'text-indigo-600' },
+];
+
+function getSubjectPalette(subject: string, subjectMap: Map<string, number>) {
+  if (!subjectMap.has(subject)) {
+    subjectMap.set(subject, subjectMap.size % SUBJECT_PALETTES.length);
+  }
+  return SUBJECT_PALETTES[subjectMap.get(subject)!];
+}
 
 export const StudyPlan = () => {
   const [genLoading, setGenLoading] = useState(false);
   const [pace, setPace] = useState('moderate');
+  const [durationMonths, setDurationMonths] = useState<3 | 4>(3);
   const [plan, setPlan] = useState<StudyPlanItem[]>([]);
+  const [source, setSource] = useState<'gemini' | 'fallback' | 'cache' | null>(null);
+  const [groupByWeek, setGroupByWeek] = useState(false);
+  const [weekPlan, setWeekPlan] = useState<StudyPlanWeek[]>([]);
   const { semester: sem, loading, error } = useSyllabus(6);
+
+  const subjectColorMap = new Map<string, number>();
 
   const generate = async () => {
     if (!sem) return;
     setGenLoading(true);
-    const completed = storage.getCompletedTopics();
-    const todo = sem.subjects.flatMap(s => 
-      s.units.flatMap(u => 
-        u.topics.filter(t => !completed.includes(t.id)).map(t => ({ ...t, subject: s.name }))
-      )
-    );
-    const result = await generateStudyPlan(todo, pace);
-    setPlan(result);
-    setGenLoading(false);
+    try {
+      const res = await fetch('/api/ai-planner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ semester: sem.semesterNumber, durationMonths }),
+      });
+
+      const raw = await res.text();
+      const data = raw ? JSON.parse(raw) : null;
+
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.message || `Planner failed (${res.status})`);
+      }
+
+      const weeks: StudyPlanWeek[] = data.plan ?? [];
+      setWeekPlan(weeks);
+      setSource(data.source ?? null);
+
+      // Flatten weeks → daily items
+      const flattened: StudyPlanItem[] = [];
+      let dayCounter = 1;
+      for (const week of weeks) {
+        for (const topic of week.topics) {
+          flattened.push({
+            day: dayCounter++,
+            subject: topic.subject,
+            topic: topic.topic,
+            estimatedTime: topic.isHighYield ? '2–3 hrs · High Yield' : '1–2 hrs',
+          });
+        }
+      }
+      setPlan(flattened);
+    } catch (err) {
+      console.error('Study plan generation failed:', err);
+    } finally {
+      setGenLoading(false);
+    }
   };
 
-  if (loading) return <div className="p-10 text-center animate-pulse text-app-muted uppercase tracking-[0.2em] font-bold">Initializing Plan Generator...</div>;
-  if (error || !sem) return <div className="p-10 text-center text-rose-500 font-bold uppercase tracking-[0.2em]">Error loading generator</div>;
+  if (loading) return (
+    <div className="flex items-center justify-center py-32">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-8 h-8 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+        <p className="text-xs font-bold text-neutral-400 uppercase tracking-[0.2em]">Loading Planner...</p>
+      </div>
+    </div>
+  );
 
+  if (error || !sem) return (
+    <div className="py-20 text-center">
+      <p className="text-sm font-bold text-rose-500 uppercase tracking-[0.15em]">Failed to load semester data</p>
+    </div>
+  );
+
+  const hasPlan = plan.length > 0;
 
   return (
-    <div className="space-y-10 pb-16">
-      {/* Configuration Hub */}
-      <div className="p-8 rounded-[1.5rem] bg-gradient-to-br from-indigo-50/50 via-white to-blue-50/50 border border-indigo-100 shadow-premium flex flex-col items-center text-center gap-6 relative overflow-hidden group">
-        <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/5 blur-[80px] -mr-24 -mt-24 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-500/5 blur-[80px] -ml-24 -mb-24 pointer-events-none" />
+    <div className="space-y-8 pb-20">
 
-        <div className="w-14 h-14 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg transform group-hover:rotate-6 transition-transform">
-          <Sparkles size={28} />
-        </div>
-        
-        <div className="max-w-md">
-          <h2 className="text-2xl font-black tracking-tight text-neutral-900 mb-2">Build your AI Roadmap</h2>
-          <p className="text-[13px] font-medium text-app-muted leading-relaxed">
-            Gemini will generate a topic-by-topic schedule optimized for your pace and high-yield content.
-          </p>
-        </div>
+      {/* ── Hero Config Card ─────────────────────────────────────────────── */}
+      <div className="relative overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm">
+        {/* Subtle grid pattern */}
+        <div
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: 'linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px)',
+            backgroundSize: '32px 32px',
+          }}
+        />
+        {/* Colour blob */}
+        <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
 
-        <div className="flex flex-col sm:flex-row items-center gap-4 w-full justify-center mt-2 group">
-          <div className="flex flex-col items-start gap-1 w-full sm:w-auto">
-            <span className="text-[10px] font-black text-app-muted uppercase tracking-[0.2em] ml-2">Study Intensity</span>
-            <Select value={pace} onValueChange={setPace}>
-              <SelectTrigger className="w-full sm:w-44 h-11 bg-white border-app-border rounded-xl font-bold text-sm shadow-sm hover:border-indigo-400 transition-colors">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl border-app-border shadow-md">
-                <SelectItem value="light" className="font-bold py-2.5">Light Pace</SelectItem>
-                <SelectItem value="moderate" className="font-bold py-2.5">Moderate</SelectItem>
-                <SelectItem value="intensive" className="font-bold py-2.5 text-orange-600">Intensive Burn</SelectItem>
-              </SelectContent>
-            </Select>
+        <div className="relative p-8">
+          {/* Header row */}
+          <div className="flex items-start justify-between mb-8">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center">
+                  <Sparkles size={14} className="text-white" />
+                </div>
+                <span className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.25em]">AI Planner</span>
+              </div>
+              <h2 className="text-2xl font-black text-neutral-900 tracking-tight leading-tight">
+                Build your study<br />roadmap
+              </h2>
+            </div>
+
+            {/* Stats pill */}
+            <div className="flex flex-col items-end gap-1.5">
+              <div className="px-3 py-1.5 rounded-xl bg-neutral-50 border border-neutral-200 text-center">
+                <p className="text-[18px] font-black text-neutral-900 leading-none">{sem.semesterNumber}</p>
+                <p className="text-[9px] font-bold text-neutral-400 uppercase tracking-widest">Semester</p>
+              </div>
+            </div>
           </div>
-          
-          <Button
-            onClick={generate}
-            disabled={genLoading}
-            className="w-full sm:w-auto h-11 px-8 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm shadow-md transition-all active:scale-95 flex items-center gap-3 mt-5 sm:mt-0"
-          >
-            {genLoading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                <span>BUILDING...</span>
-              </>
-            ) : (
-              <>
-                <TrendingUp size={18} />
-                <span>GENERATE MASTERPLAN</span>
-              </>
-            )}
-          </Button>
+
+          {/* Controls row */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
+            {/* Intensity */}
+            <div className="flex flex-col gap-1.5 flex-1">
+              <label className="text-[9px] font-black text-neutral-400 uppercase tracking-[0.2em] pl-1">
+                Study Intensity
+              </label>
+              <Select value={pace} onValueChange={setPace}>
+                <SelectTrigger className="h-10 bg-neutral-50 border-neutral-200 rounded-xl font-bold text-sm hover:border-indigo-300 transition-colors focus:ring-indigo-500">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-neutral-200 shadow-lg">
+                  <SelectItem value="light" className="font-semibold py-2.5 text-sm">🌿 Light Pace</SelectItem>
+                  <SelectItem value="moderate" className="font-semibold py-2.5 text-sm">⚡ Moderate</SelectItem>
+                  <SelectItem value="intensive" className="font-semibold py-2.5 text-sm text-orange-600">🔥 Intensive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Duration */}
+            <div className="flex flex-col gap-1.5 flex-1">
+              <label className="text-[9px] font-black text-neutral-400 uppercase tracking-[0.2em] pl-1">
+                Duration
+              </label>
+              <Select
+                value={String(durationMonths)}
+                onValueChange={(v) => setDurationMonths(Number(v) as 3 | 4)}
+              >
+                <SelectTrigger className="h-10 bg-neutral-50 border-neutral-200 rounded-xl font-bold text-sm hover:border-indigo-300 transition-colors focus:ring-indigo-500">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-neutral-200 shadow-lg">
+                  <SelectItem value="3" className="font-semibold py-2.5 text-sm">3 Months</SelectItem>
+                  <SelectItem value="4" className="font-semibold py-2.5 text-sm">4 Months</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Generate */}
+            <Button
+              onClick={generate}
+              disabled={genLoading}
+              className="h-10 px-7 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[11px] tracking-wider shadow-sm transition-all active:scale-95 flex items-center gap-2 sm:self-end"
+            >
+              {genLoading ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  BUILDING...
+                </>
+              ) : (
+                <>
+                  <TrendingUp size={14} />
+                  GENERATE
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* Source badge — shows after plan loads */}
+          {source && (
+            <div className="mt-5 flex items-center gap-2">
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${
+                source === 'gemini'
+                  ? 'bg-indigo-50 border-indigo-100 text-indigo-600'
+                  : source === 'cache'
+                  ? 'bg-emerald-50 border-emerald-100 text-emerald-600'
+                  : 'bg-amber-50 border-amber-100 text-amber-600'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  source === 'gemini' ? 'bg-indigo-500' : source === 'cache' ? 'bg-emerald-500' : 'bg-amber-500'
+                }`} />
+                {source === 'gemini' ? 'AI Generated' : source === 'cache' ? 'Cached Plan' : 'Smart Schedule'}
+              </span>
+              <span className="text-[10px] text-neutral-400 font-medium">
+                {plan.length} topics · {durationMonths} months
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* The Roadmap */}
+      {/* ── Plan Output ──────────────────────────────────────────────────── */}
       <AnimatePresence mode="wait">
-        {plan.length > 0 ? (
+        {hasPlan ? (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            key="plan"
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.35 }}
             className="space-y-6"
           >
-            <div className="flex items-center gap-4 px-2">
-              <h3 className="text-[11px] font-bold text-app-muted uppercase tracking-[0.2em]">Personal Roadmap</h3>
-              <div className="flex-1 h-px bg-app-border/60" />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {plan.map((item, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.1 * i }}
-                  className="p-6 rounded-2xl bg-white border border-app-border shadow-sm hover:shadow-md transition-all flex flex-col relative group h-full cursor-pointer overflow-hidden"
-                >
-                   {/* Background Number Accent */}
-                   <span className="absolute -right-2 top-0 text-[120px] font-bold opacity-5 text-neutral-400 select-none group-hover:scale-110 group-hover:opacity-10 transition-all pointer-events-none">
-                     {i+1}
-                   </span>
-                   
-                   <div className="flex items-start justify-between mb-4 relative z-10">
-                     <span className="px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-100 text-[10px] font-bold text-indigo-600 uppercase tracking-widest leading-none">
-                       Day {item.day}
-                     </span>
-                     <FlaskConical size={18} className="text-neutral-300 group-hover:text-indigo-400 transition-colors" />
-                   </div>
-
-                   <div className="flex-1 relative z-10">
-                     <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-[0.1em] mb-1">{item.subject}</p>
-                     <p className="text-base font-bold text-neutral-800 leading-snug group-hover:text-indigo-600 transition-colors">{item.topic}</p>
-                   </div>
-
-                   <div className="mt-6 flex items-center gap-2 relative z-10 pt-4 border-t border-dotted border-app-border">
-                     <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" />
-                     <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-tight">{item.estimatedTime}</p>
-                   </div>
-                </motion.div>
-              ))}
-            </div>
-
-            {/* Achievement Footer */}
-            <div className="p-8 rounded-[1.5rem] bg-emerald-50 border border-emerald-100/50 flex flex-col items-center justify-center text-center gap-2">
-              <div className="w-10 h-10 rounded-xl bg-white border border-emerald-200 flex items-center justify-center shadow-sm text-emerald-600 mb-1">
-                <PartyPopper size={20} />
+            {/* Section header + view toggle */}
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] font-black text-neutral-400 uppercase tracking-[0.2em]">
+                  Your Roadmap
+                </span>
+                <div className="h-px w-12 bg-neutral-200" />
               </div>
-              <p className="text-sm font-black text-emerald-900">Finish topics to update your plan.</p>
-              <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest opacity-80">STAY CONSISTENT, STAY AHEAD</p>
+
+              {/* Week / Day toggle */}
+              <div className="flex items-center gap-1 p-1 rounded-xl bg-neutral-100 border border-neutral-200">
+                <button
+                  onClick={() => setGroupByWeek(false)}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
+                    !groupByWeek
+                      ? 'bg-white text-indigo-600 shadow-sm border border-neutral-200'
+                      : 'text-neutral-400 hover:text-neutral-600'
+                  }`}
+                >
+                  By Day
+                </button>
+                <button
+                  onClick={() => setGroupByWeek(true)}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
+                    groupByWeek
+                      ? 'bg-white text-indigo-600 shadow-sm border border-neutral-200'
+                      : 'text-neutral-400 hover:text-neutral-600'
+                  }`}
+                >
+                  By Week
+                </button>
+              </div>
             </div>
+
+            {/* ── By Day view ── */}
+            {!groupByWeek && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {plan.map((item, i) => {
+                  const palette = getSubjectPalette(item.subject, subjectColorMap);
+                  const isHighYield = item.estimatedTime.includes('High Yield');
+                  return (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: Math.min(i * 0.04, 0.6) }}
+                      className={`relative p-5 rounded-2xl border ${palette.bg} ${palette.border} flex flex-col gap-3 group hover:shadow-md transition-all duration-200 overflow-hidden`}
+                    >
+                      {/* Big number watermark */}
+                      <span className="absolute -right-1 -bottom-3 text-[72px] font-black opacity-[0.07] text-neutral-900 select-none pointer-events-none leading-none">
+                        {item.day}
+                      </span>
+
+                      {/* Top row */}
+                      <div className="flex items-center justify-between">
+                        <span className={`text-[9px] font-black uppercase tracking-[0.2em] px-2 py-1 rounded-lg border ${palette.badge} ${palette.border}`}>
+                          Day {item.day}
+                        </span>
+                        {isHighYield && (
+                          <span className="flex items-center gap-1 text-[9px] font-black text-amber-600 uppercase tracking-wider">
+                            <Star size={10} className="fill-amber-500 text-amber-500" />
+                            High Yield
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Subject */}
+                      <div>
+                        <p className={`text-[9px] font-black uppercase tracking-[0.15em] mb-1 ${palette.accent}`}>
+                          {item.subject}
+                        </p>
+                        <p className="text-[13px] font-bold text-neutral-800 leading-snug line-clamp-2">
+                          {item.topic}
+                        </p>
+                      </div>
+
+                      {/* Footer */}
+                      <div className="flex items-center gap-1.5 pt-2 border-t border-neutral-200/60">
+                        <Clock size={10} className="text-neutral-400" />
+                        <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">
+                          {item.estimatedTime.split('·')[0].trim()}
+                        </span>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* ── By Week view ── */}
+            {groupByWeek && (
+              <div className="space-y-4">
+                {weekPlan.map((week, wi) => (
+                  <motion.div
+                    key={wi}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: wi * 0.06 }}
+                    className="rounded-2xl border border-neutral-200 bg-white overflow-hidden shadow-sm"
+                  >
+                    {/* Week header */}
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-100 bg-neutral-50">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center">
+                          <span className="text-[11px] font-black text-white">W{week.week}</span>
+                        </div>
+                        <div>
+                          <p className="text-xs font-black text-neutral-800">
+                            Month {week.month} · Week {week.week}
+                          </p>
+                          <p className="text-[10px] font-medium text-neutral-400">
+                            {week.startDate} → {week.endDate}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[9px] font-black text-neutral-400 uppercase tracking-wider">
+                          {week.topics.length} topics
+                        </span>
+                        <span className="px-2 py-1 rounded-lg bg-indigo-50 border border-indigo-100 text-[9px] font-black text-indigo-600 uppercase tracking-wider max-w-[160px] truncate">
+                          {week.focus}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Topics list */}
+                    <div className="divide-y divide-neutral-50">
+                      {week.topics.map((topic, ti) => {
+                        const palette = getSubjectPalette(topic.subject, subjectColorMap);
+                        return (
+                          <div
+                            key={ti}
+                            className="flex items-center gap-4 px-5 py-3.5 hover:bg-neutral-50 transition-colors"
+                          >
+                            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${palette.dot}`} />
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-[9px] font-black uppercase tracking-wider mb-0.5 ${palette.accent}`}>
+                                {topic.subject}
+                              </p>
+                              <p className="text-[12px] font-semibold text-neutral-700 truncate">
+                                {topic.topic}
+                              </p>
+                            </div>
+                            {topic.isHighYield && (
+                              <Star size={12} className="flex-shrink-0 fill-amber-400 text-amber-400" />
+                            )}
+                          </div>
+                        );
+                      })}
+                      {week.topics.length === 0 && (
+                        <div className="px-5 py-4 text-[11px] font-bold text-neutral-300 uppercase tracking-wider">
+                          Revision / buffer week
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+
+            {/* ── Footer ── */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.4 }}
+              className="flex items-center gap-4 p-6 rounded-2xl bg-emerald-50 border border-emerald-100"
+            >
+              <div className="w-10 h-10 rounded-xl bg-white border border-emerald-200 flex items-center justify-center shadow-sm flex-shrink-0">
+                <PartyPopper size={18} className="text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-sm font-black text-emerald-900">Plan locked in.</p>
+                <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mt-0.5">
+                  Mark topics done to auto-refresh your schedule
+                </p>
+              </div>
+            </motion.div>
           </motion.div>
-        ) : !genLoading && (
-          <div className="py-20 flex flex-col items-center justify-center text-center opacity-30 select-none pointer-events-none">
-            <Calendar size={64} strokeWidth={1} className="mb-4" />
-            <p className="text-sm font-bold max-w-xs">Enter your exam date in Settings to see exact day counts.</p>
-          </div>
+        ) : !genLoading ? (
+          <motion.div
+            key="empty"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="py-24 flex flex-col items-center justify-center text-center"
+          >
+            <div className="w-16 h-16 rounded-2xl bg-neutral-100 border border-neutral-200 flex items-center justify-center mb-5">
+              <Calendar size={28} strokeWidth={1.5} className="text-neutral-300" />
+            </div>
+            <p className="text-sm font-black text-neutral-300 uppercase tracking-[0.2em] mb-2">No Plan Yet</p>
+            <p className="text-[12px] text-neutral-400 font-medium max-w-[220px] leading-relaxed">
+              Hit Generate to build your personalised study roadmap
+            </p>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="skeleton"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+          >
+            {Array.from({ length: 9 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-36 rounded-2xl bg-neutral-100 border border-neutral-200 animate-pulse"
+                style={{ animationDelay: `${i * 60}ms` }}
+              />
+            ))}
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
