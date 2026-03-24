@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
+import { FileText, Wand2, RefreshCw, Brain } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -303,33 +304,233 @@ export default function QuestionPaperPage() {
   }
 
   return (
-    <main className="min-h-screen bg-app-bg px-4 py-8 sm:px-6">
-      <div className="mx-auto mb-4 flex w-full max-w-7xl justify-end">
-        <Button asChild variant="outline" size="sm">
-          <Link href="/student">Go to Student</Link>
-        </Button>
-      </div>
-      <div className="mx-auto grid w-full max-w-7xl gap-6 lg:grid-cols-[360px_1fr]">
-        <Card className="border border-app-border bg-white">
-          <CardHeader>
-            <CardTitle className="text-xl">Question Paper Workflow</CardTitle>
-            <p className="text-sm text-app-muted">Ingest qpaper, extract questions, then answer with notes or Gemini.</p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {workflowSteps.map((step) => (
-              <div
-                key={step.id}
-                className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm ${
-                  step.done ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-app-border bg-neutral-50 text-app-muted'
-                }`}
-              >
-                <span>{step.id}. {step.label}</span>
-                <span className="text-xs font-semibold uppercase">{step.done ? 'Done' : 'Pending'}</span>
-              </div>
-            ))}
+    <div
+      style={{
+        minHeight: '100vh',
+        backgroundColor: '#F5F4F0',
+        color: '#1A1916',
+        fontFamily: "'DM Sans', sans-serif",
+      }}
+    >
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,700;0,9..40,800&family=DM+Serif+Display:ital@0;1&display=swap');
 
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-app-text">Uploaded Question Papers</label>
+        .qp-wordmark { font-family: 'DM Serif Display', serif; }
+
+        .qp-card {
+          background: #FDFCF9;
+          border: 1.5px solid #E8E6E0;
+          border-radius: 20px;
+        }
+
+        .qp-tag {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 12px;
+          border-radius: 100px;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+        }
+
+        .qp-btn-ghost {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: transparent;
+          color: #6B6860;
+          border-radius: 10px;
+          font-family: 'DM Sans', sans-serif;
+          font-weight: 600;
+          font-size: 12px;
+          padding: 8px 14px;
+          border: 1.5px solid #E8E6E0;
+          transition: border-color 0.2s, color 0.2s, background 0.2s;
+          cursor: pointer;
+          text-decoration: none;
+          white-space: nowrap;
+        }
+        .qp-btn-ghost:hover { border-color: #C8C6BF; color: #1A1916; background: #FDFCF9; }
+
+        .qp-btn-dark {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          border: none;
+          border-radius: 12px;
+          height: 40px;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          background: #1A1916;
+          color: #F5F4F0;
+          transition: background 0.2s ease;
+          cursor: pointer;
+        }
+        .qp-btn-dark:hover:not(:disabled) { background: #2E2D29; }
+        .qp-btn-dark:disabled { background: #9E9B94; cursor: not-allowed; }
+
+        .qp-input {
+          width: 100%;
+          border: 1.5px solid #E8E6E0;
+          border-radius: 10px;
+          height: 40px;
+          padding: 0 12px;
+          font-size: 13px;
+          background: #F5F4F0;
+          color: #1A1916;
+        }
+        .qp-input:focus { outline: none; border-color: #C8D8F0; box-shadow: 0 0 0 2px rgba(90,122,181,0.16); }
+
+        .qp-scrollarea::-webkit-scrollbar { width: 4px; }
+        .qp-scrollarea::-webkit-scrollbar-track { background: transparent; }
+        .qp-scrollarea::-webkit-scrollbar-thumb { background: #E8E6E0; border-radius: 99px; }
+        .qp-scrollarea::-webkit-scrollbar-thumb:hover { background: #C8C6BF; }
+
+        .dot-grid-qp {
+          background-image: radial-gradient(circle, #D0CEC8 1px, transparent 1px);
+          background-size: 28px 28px;
+        }
+      `}</style>
+
+      <header
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 20,
+          height: 64,
+          backgroundColor: 'rgba(245,244,240,0.88)',
+          backdropFilter: 'blur(12px)',
+          borderBottom: '1px solid #E8E6E0',
+          padding: '0 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              background: '#1A1916',
+              borderRadius: 10,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ color: '#F5F4F0', fontSize: 13, fontWeight: 800, fontFamily: 'DM Serif Display, serif' }}>
+              C
+            </span>
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <h1 className="qp-wordmark" style={{ fontSize: 20, fontWeight: 400, letterSpacing: '-0.02em', lineHeight: 1 }}>
+              Question Paper Lab
+            </h1>
+            <p style={{ fontSize: 11, color: '#9E9B94', fontWeight: 500, marginTop: 2 }}>
+              Ingest papers, extract questions, generate guided answers
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Button asChild variant="outline" className="qp-btn-ghost">
+            <Link href="/student">Back to student</Link>
+          </Button>
+          <button
+            className="qp-btn-ghost"
+            onClick={() => {
+              void loadQpaperList(selectedQpaperId || undefined, selectedNotesId || undefined);
+            }}
+            disabled={loadingQpaperList}
+          >
+            <RefreshCw size={14} className={loadingQpaperList ? 'animate-spin' : ''} />
+            Refresh Docs
+          </button>
+        </div>
+      </header>
+
+      <main style={{ position: 'relative', padding: 24 }}>
+        <div
+          className="dot-grid-qp"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 220,
+            opacity: 0.3,
+            pointerEvents: 'none',
+            maskImage: 'linear-gradient(to bottom, black 0%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, black 0%, transparent 100%)',
+          }}
+        />
+
+        <div
+          style={{
+            maxWidth: 1220,
+            margin: '0 auto',
+            display: 'grid',
+            gridTemplateColumns: 'minmax(320px, 390px) minmax(0, 1fr)',
+            gap: 20,
+            position: 'relative',
+            zIndex: 1,
+          }}
+        >
+          <motion.section
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="qp-card"
+            style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}
+          >
+            <div>
+              <span className="qp-tag" style={{ backgroundColor: '#E4ECFB', color: '#5A7AB5' }}>
+                <FileText size={12} />
+                Workflow
+              </span>
+              <p style={{ fontSize: 13, color: '#7A7872', marginTop: 10 }}>
+                Select or ingest a paper, extract questions, then answer from notes or Gemini.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {workflowSteps.map((step) => (
+                <div
+                  key={step.id}
+                  style={{
+                    borderRadius: 12,
+                    border: `1.5px solid ${step.done ? '#B8DEC9' : '#E8E6E0'}`,
+                    backgroundColor: step.done ? '#E2F5EA' : '#F5F4F0',
+                    color: step.done ? '#4A9068' : '#7A7872',
+                    padding: '10px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 8,
+                    fontSize: 12,
+                    fontWeight: 600,
+                  }}
+                >
+                  <span>{step.id}. {step.label}</span>
+                  <span style={{ fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    {step.done ? 'Done' : 'Pending'}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9E9B94' }}>
+                Uploaded Question Papers
+              </label>
               <Select
                 value={selectedQpaperId}
                 onValueChange={(value) => {
@@ -337,7 +538,7 @@ export default function QuestionPaperPage() {
                 }}
                 disabled={loadingQpaperList || qpaperOptions.length === 0}
               >
-                <SelectTrigger className="w-full h-10">
+                <SelectTrigger style={{ height: 40, border: '1.5px solid #E8E6E0', borderRadius: 10, background: '#F5F4F0' }}>
                   <SelectValue
                     placeholder={
                       loadingQpaperList
@@ -356,123 +557,165 @@ export default function QuestionPaperPage() {
                   ))}
                 </SelectContent>
               </Select>
-              {qpaperListError && <p className="text-xs text-red-600">{qpaperListError}</p>}
+              {qpaperListError && <p style={{ color: '#C06060', fontSize: 12 }}>{qpaperListError}</p>}
             </div>
 
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                void loadQpaperList(selectedQpaperId || undefined, selectedNotesId || undefined);
-              }}
-              disabled={loadingQpaperList}
-            >
-              {loadingQpaperList ? 'Refreshing...' : 'Refresh Uploaded Documents'}
-            </Button>
-
-            <form onSubmit={ingestQuestionPaper} className="space-y-2 pt-2">
-              <label className="text-sm font-medium text-app-text">Question Paper PDF URL</label>
+            <form onSubmit={ingestQuestionPaper} style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 2 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9E9B94' }}>
+                Question Paper PDF URL
+              </label>
               <Input
+                className="qp-input"
                 placeholder="https://example.com/question-paper.pdf"
                 value={questionPaperUrl}
                 onChange={(event) => setQuestionPaperUrl(event.target.value)}
                 required
               />
-              <Button
+              <button
                 type="submit"
-                className="w-full bg-black text-white hover:bg-neutral-800"
+                className="qp-btn-dark"
                 disabled={loadingQpaper || !questionPaperUrl.trim()}
               >
-                {loadingQpaper ? 'Ingesting Question Paper...' : 'Ingest Question Paper'}
-              </Button>
+                {loadingQpaper ? 'Ingesting...' : 'Ingest Question Paper'}
+              </button>
             </form>
 
-            <form onSubmit={ingestNotes} className="space-y-2">
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-app-text">Uploaded Notes</label>
-                <Select
-                  value={selectedNotesId}
-                  onValueChange={(value) => {
-                    setSelectedNotesId(value);
-                    setNotesResult(null);
-                    setAnswer('');
-                  }}
-                  disabled={loadingQpaperList || notesOptions.length === 0}
-                >
-                  <SelectTrigger className="w-full h-10">
-                    <SelectValue
-                      placeholder={
-                        loadingQpaperList
-                          ? 'Loading uploaded notes...'
-                          : notesOptions.length === 0
-                            ? 'No uploaded notes found yet'
-                            : 'Select uploaded notes'
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {notesOptions.map((item) => (
-                      <SelectItem key={item.document_id} value={item.document_id}>
-                        {(item.document_name || item.document_id).slice(0, 56)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <label className="text-sm font-medium text-app-text">Notes PDF URL (optional)</label>
-              <Input
-                placeholder="https://example.com/notes.pdf"
-                value={notesUrl}
-                onChange={(event) => setNotesUrl(event.target.value)}
-              />
-              <Button
-                type="submit"
-                variant="outline"
-                className="w-full"
-                disabled={loadingNotes || !notesUrl.trim()}
+            <div style={{ borderTop: '1px solid #E8E6E0', marginTop: 2, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9E9B94' }}>
+                Uploaded Notes
+              </label>
+              <Select
+                value={selectedNotesId}
+                onValueChange={(value) => {
+                  setSelectedNotesId(value);
+                  setNotesResult(null);
+                  setAnswer('');
+                }}
+                disabled={loadingQpaperList || notesOptions.length === 0}
               >
-                {loadingNotes ? 'Ingesting Notes...' : 'Ingest Notes'}
-              </Button>
-            </form>
+                <SelectTrigger style={{ height: 40, border: '1.5px solid #E8E6E0', borderRadius: 10, background: '#F5F4F0' }}>
+                  <SelectValue
+                    placeholder={
+                      loadingQpaperList
+                        ? 'Loading uploaded notes...'
+                        : notesOptions.length === 0
+                          ? 'No uploaded notes found yet'
+                          : 'Select uploaded notes'
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {notesOptions.map((item) => (
+                    <SelectItem key={item.document_id} value={item.document_id}>
+                      {(item.document_name || item.document_id).slice(0, 56)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <form onSubmit={ingestNotes} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9E9B94' }}>
+                  Notes PDF URL (optional)
+                </label>
+                <Input
+                  className="qp-input"
+                  placeholder="https://example.com/notes.pdf"
+                  value={notesUrl}
+                  onChange={(event) => setNotesUrl(event.target.value)}
+                />
+                <button
+                  type="submit"
+                  className="qp-btn-ghost"
+                  style={{ justifyContent: 'center', height: 40 }}
+                  disabled={loadingNotes || !notesUrl.trim()}
+                >
+                  {loadingNotes ? 'Ingesting Notes...' : 'Ingest Notes'}
+                </button>
+              </form>
+            </div>
 
             {qpaperResult && (
-              <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+              <p
+                style={{
+                  borderRadius: 12,
+                  border: '1.5px solid #B8DEC9',
+                  backgroundColor: '#E2F5EA',
+                  color: '#4A9068',
+                  padding: '10px 12px',
+                  fontSize: 12,
+                }}
+              >
                 Qpaper ready: {qpaperResult.question_count} questions parsed.
               </p>
             )}
 
             {notesResult && (
-              <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                Notes ready for RAG answers.
+              <p
+                style={{
+                  borderRadius: 12,
+                  border: '1.5px solid #B8DEC9',
+                  backgroundColor: '#E2F5EA',
+                  color: '#4A9068',
+                  padding: '10px 12px',
+                  fontSize: 12,
+                }}
+              >
+                Notes ready for answer generation.
               </p>
             )}
 
             {selectedNotesId && !notesResult && (
-              <p className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+              <p
+                style={{
+                  borderRadius: 12,
+                  border: '1.5px solid #C8D8F0',
+                  backgroundColor: '#E4ECFB',
+                  color: '#5A7AB5',
+                  padding: '10px 12px',
+                  fontSize: 12,
+                }}
+              >
                 Using existing uploaded notes.
               </p>
             )}
 
             {error && (
-              <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+              <p
+                style={{
+                  borderRadius: 12,
+                  border: '1.5px solid #F0C0C0',
+                  backgroundColor: '#FDE8E8',
+                  color: '#C06060',
+                  padding: '10px 12px',
+                  fontSize: 12,
+                }}
+              >
+                {error}
+              </p>
             )}
-          </CardContent>
-        </Card>
+          </motion.section>
 
-        <div className="space-y-6">
-          <Card className="border border-app-border bg-white">
-            <CardHeader>
-              <CardTitle className="text-lg">Extracted Questions</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <div style={{ display: 'grid', gap: 20, minWidth: 0 }}>
+            <motion.section
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: 0.05 }}
+              className="qp-card"
+              style={{ padding: 20 }}
+            >
+              <div style={{ marginBottom: 12 }}>
+                <span className="qp-tag" style={{ backgroundColor: '#E2F5EA', color: '#4A9068' }}>
+                  <Wand2 size={12} />
+                  Extracted Questions
+                </span>
+              </div>
+
               {loadingQuestions ? (
-                <p className="text-sm text-app-muted">Extracting questions...</p>
+                <p style={{ fontSize: 13, color: '#7A7872' }}>Extracting questions...</p>
               ) : questions.length === 0 ? (
-                <p className="text-sm text-app-muted">No questions yet. Ingest a question paper first.</p>
+                <p style={{ fontSize: 13, color: '#9E9B94' }}>No questions yet. Ingest or select a question paper first.</p>
               ) : (
-                <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                <div className="qp-scrollarea" style={{ maxHeight: 360, overflowY: 'auto', paddingRight: 2, display: 'grid', gap: 8 }}>
                   {questions.map((item) => {
                     const selected = selectedQuestion === item.text_preview;
                     return (
@@ -483,90 +726,133 @@ export default function QuestionPaperPage() {
                           setSelectedQuestion(item.text_preview);
                           setAnswer('');
                         }}
-                        className={`w-full rounded-lg border p-3 text-left text-sm transition ${
-                          selected
-                            ? 'border-black bg-black text-white'
-                            : 'border-app-border bg-neutral-50 text-app-text hover:bg-neutral-100'
-                        }`}
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          borderRadius: 12,
+                          border: selected ? '1.5px solid #1A1916' : '1.5px solid #E8E6E0',
+                          backgroundColor: selected ? '#1A1916' : '#F5F4F0',
+                          color: selected ? '#F5F4F0' : '#1A1916',
+                          padding: '10px 12px',
+                          transition: 'all 0.18s ease',
+                          cursor: 'pointer',
+                        }}
                       >
-                        <div className="mb-1 text-xs font-semibold uppercase opacity-70">
+                        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.75, marginBottom: 4 }}>
                           {item.metadata?.question_number ? `Q${item.metadata.question_number}` : 'Question'}
                         </div>
-                        <div>{item.text_preview}</div>
+                        <div style={{ fontSize: 13, lineHeight: 1.55 }}>{item.text_preview}</div>
                       </button>
                     );
                   })}
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </motion.section>
 
-          <Card className="border border-app-border bg-white">
-            <CardHeader>
-              <CardTitle className="text-lg">Answer Selected Question</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-app-text">Selected question</label>
+            <motion.section
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.1 }}
+              className="qp-card"
+              style={{ padding: 20 }}
+            >
+              <div style={{ marginBottom: 12 }}>
+                <span className="qp-tag" style={{ backgroundColor: '#FDE8E8', color: '#C06060' }}>
+                  <Brain size={12} />
+                  Answer Selected Question
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gap: 10 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9E9B94' }}>
+                  Selected Question
+                </label>
                 <textarea
                   value={selectedQuestion}
                   onChange={(event) => setSelectedQuestion(event.target.value)}
                   rows={4}
-                  className="w-full rounded-lg border border-app-border bg-neutral-50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-neutral-200"
+                  style={{
+                    width: '100%',
+                    borderRadius: 12,
+                    border: '1.5px solid #E8E6E0',
+                    backgroundColor: '#F5F4F0',
+                    color: '#1A1916',
+                    padding: '10px 12px',
+                    fontSize: 13,
+                    lineHeight: 1.55,
+                    resize: 'vertical',
+                    outline: 'none',
+                  }}
                   placeholder="Select or edit a question"
                 />
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
                 <button
                   type="button"
                   onClick={() => setAnswerMode('notes')}
                   disabled={!canUseNotes}
-                  className={`rounded-lg border px-3 py-1.5 text-sm ${
-                    answerMode === 'notes'
-                      ? 'border-black bg-black text-white'
-                      : 'border-app-border bg-white text-app-text'
-                  } ${!canUseNotes ? 'cursor-not-allowed opacity-50' : ''}`}
+                  className="qp-btn-ghost"
+                  style={{
+                    borderColor: answerMode === 'notes' ? '#1A1916' : '#E8E6E0',
+                    backgroundColor: answerMode === 'notes' ? '#1A1916' : 'transparent',
+                    color: answerMode === 'notes' ? '#F5F4F0' : '#1A1916',
+                    opacity: canUseNotes ? 1 : 0.55,
+                  }}
                 >
                   Use Uploaded Notes
                 </button>
                 <button
                   type="button"
                   onClick={() => setAnswerMode('gemini')}
-                  className={`rounded-lg border px-3 py-1.5 text-sm ${
-                    answerMode === 'gemini'
-                      ? 'border-black bg-black text-white'
-                      : 'border-app-border bg-white text-app-text'
-                  }`}
+                  className="qp-btn-ghost"
+                  style={{
+                    borderColor: answerMode === 'gemini' ? '#1A1916' : '#E8E6E0',
+                    backgroundColor: answerMode === 'gemini' ? '#1A1916' : 'transparent',
+                    color: answerMode === 'gemini' ? '#F5F4F0' : '#1A1916',
+                  }}
                 >
                   Use Gemini
                 </button>
               </div>
 
-              <Button
+              <button
                 onClick={answerSelectedQuestion}
-                className="bg-black text-white hover:bg-neutral-800"
+                className="qp-btn-dark"
+                style={{ marginTop: 12, minWidth: 180, padding: '0 18px' }}
                 disabled={loadingAnswer || !selectedQuestion.trim() || (answerMode === 'notes' && !canUseNotes)}
               >
-                {loadingAnswer ? 'Generating Answer...' : 'Generate Answer'}
-              </Button>
+                {loadingAnswer ? 'Generating...' : 'Generate Answer'}
+              </button>
 
-              <div className="rounded-lg border border-app-border bg-neutral-50 p-3">
+              <div
+                className="qp-scrollarea"
+                style={{
+                  marginTop: 12,
+                  borderRadius: 14,
+                  border: '1.5px solid #E8E6E0',
+                  backgroundColor: '#F5F4F0',
+                  padding: '12px 14px',
+                  minHeight: 180,
+                  maxHeight: 360,
+                  overflowY: 'auto',
+                }}
+              >
                 {answer ? (
-                  <div className="text-sm text-app-text">
+                  <div style={{ fontSize: 13, color: '#1A1916', lineHeight: 1.65 }}>
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       components={{
-                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                        ul: ({ children }) => <ul className="mb-2 list-disc pl-5 last:mb-0">{children}</ul>,
-                        ol: ({ children }) => <ol className="mb-2 list-decimal pl-5 last:mb-0">{children}</ol>,
-                        li: ({ children }) => <li className="mb-1 last:mb-0">{children}</li>,
-                        strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                        p: ({ children }) => <p style={{ marginBottom: 8 }}>{children}</p>,
+                        ul: ({ children }) => <ul style={{ marginBottom: 8, paddingLeft: 20, listStyle: 'disc' }}>{children}</ul>,
+                        ol: ({ children }) => <ol style={{ marginBottom: 8, paddingLeft: 20, listStyle: 'decimal' }}>{children}</ol>,
+                        li: ({ children }) => <li style={{ marginBottom: 4 }}>{children}</li>,
+                        strong: ({ children }) => <strong style={{ fontWeight: 700 }}>{children}</strong>,
                         code: ({ children }) => (
-                          <code className="rounded bg-white px-1 py-0.5 text-[0.9em]">{children}</code>
+                          <code style={{ borderRadius: 6, background: '#FDFCF9', padding: '2px 6px', fontSize: '0.9em' }}>{children}</code>
                         ),
                         pre: ({ children }) => (
-                          <pre className="mb-2 overflow-x-auto rounded bg-white p-2 text-[0.9em] last:mb-0">
+                          <pre style={{ marginBottom: 8, overflowX: 'auto', borderRadius: 8, background: '#FDFCF9', padding: 10, fontSize: '0.9em' }}>
                             {children}
                           </pre>
                         ),
@@ -576,13 +862,13 @@ export default function QuestionPaperPage() {
                     </ReactMarkdown>
                   </div>
                 ) : (
-                  <p className="text-sm text-app-muted">Answer will appear here.</p>
+                  <p style={{ fontSize: 13, color: '#9E9B94' }}>Answer will appear here.</p>
                 )}
               </div>
-            </CardContent>
-          </Card>
+            </motion.section>
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

@@ -5,6 +5,7 @@ import { SESSION_COOKIE_NAME, SESSION_USER_ID_COOKIE_NAME, isSessionRole } from 
 import { connectToDatabase } from '@/lib/mongoose';
 import { Hod } from '@/models/hod';
 import { Class } from '@/models/class';
+import '@/models/faculty';
 import '@/models/student';
 
 interface CourseAssignmentInput {
