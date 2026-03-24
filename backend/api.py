@@ -2,8 +2,19 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 
-from backend.schemas import IngestRequest, IngestResponse, QueryRequest, QueryResponse
-from backend.services import get_ingestion_status, ingest_document, query_vectors
+from backend.schemas import (
+    IngestRequest,
+    IngestResponse,
+    QueryCleanResponse,
+    QueryRequest,
+    QueryResponse,
+)
+from backend.services import (
+    get_ingestion_status,
+    ingest_document,
+    query_clean,
+    query_vectors,
+)
 from backend.state import AppState, lifespan
 
 app = FastAPI(title="Cursus", version="0.1.0", lifespan=lifespan)
@@ -35,3 +46,9 @@ def ingest(payload: IngestRequest) -> IngestResponse:
 def query(payload: QueryRequest) -> QueryResponse:
     state: AppState = app.state.state
     return query_vectors(state, payload)
+
+
+@app.post("/query-clean", response_model=QueryCleanResponse)
+def query_clean_endpoint(payload: QueryRequest) -> QueryCleanResponse:
+    state: AppState = app.state.state
+    return query_clean(state, payload)
