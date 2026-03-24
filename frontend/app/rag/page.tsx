@@ -2,13 +2,13 @@
 
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { RefreshCw, BookOpen, MessageSquare, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -51,7 +51,6 @@ export default function RagWorkflowPage() {
   const [selectedDocumentId, setSelectedDocumentId] = useState('');
 
   const activeDocumentId = ingestResult?.document_id || selectedDocumentId;
-
   const isReady = Boolean(activeDocumentId);
 
   const notesDocuments = useMemo(
@@ -186,247 +185,487 @@ export default function RagWorkflowPage() {
   }
 
   return (
-    <div className="flex h-screen bg-app-bg text-app-text overflow-hidden">
-      <main className="flex-1 overflow-y-auto flex flex-col">
-        <div className="flex-1 m-3 sm:m-6 bg-app-surface rounded-[1.25rem] border border-app-border shadow-premium overflow-hidden flex flex-col">
-          <header className="px-4 sm:px-8 py-4 sm:py-6 border-b border-app-border shrink-0 flex items-center justify-between">
-            <div className="min-w-0">
-              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-neutral-900">RAG Workspace</h1>
-              <p className="hidden sm:block text-[13px] text-app-muted mt-0.5 line-clamp-1">
-                Reuse uploaded notes, ingest new PDFs, and query with response style controls.
+    <div
+      style={{
+        minHeight: '100vh',
+        backgroundColor: '#F5F4F0',
+        color: '#1A1916',
+        fontFamily: "'DM Sans', sans-serif",
+      }}
+    >
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,700;0,9..40,800&family=DM+Serif+Display:ital@0;1&display=swap');
+
+        .rag-wordmark { font-family: 'DM Serif Display', serif; }
+
+        .rag-card {
+          background: #FDFCF9;
+          border: 1.5px solid #E8E6E0;
+          border-radius: 20px;
+        }
+
+        .rag-tag {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 12px;
+          border-radius: 100px;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+        }
+
+        .rag-btn-ghost {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: transparent;
+          color: #6B6860;
+          border-radius: 10px;
+          font-family: 'DM Sans', sans-serif;
+          font-weight: 600;
+          font-size: 12px;
+          padding: 8px 14px;
+          border: 1.5px solid #E8E6E0;
+          transition: border-color 0.2s, color 0.2s, background 0.2s;
+          cursor: pointer;
+          text-decoration: none;
+          white-space: nowrap;
+        }
+        .rag-btn-ghost:hover { border-color: #C8C6BF; color: #1A1916; background: #FDFCF9; }
+
+        .rag-btn-dark {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          border: none;
+          border-radius: 12px;
+          height: 40px;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          background: #1A1916;
+          color: #F5F4F0;
+          transition: background 0.2s ease;
+          cursor: pointer;
+        }
+        .rag-btn-dark:hover:not(:disabled) { background: #2E2D29; }
+        .rag-btn-dark:disabled { background: #9E9B94; cursor: not-allowed; }
+
+        .rag-input {
+          width: 100%;
+          border: 1.5px solid #E8E6E0;
+          border-radius: 10px;
+          height: 40px;
+          padding: 0 12px;
+          font-size: 13px;
+          background: #F5F4F0;
+          color: #1A1916;
+        }
+        .rag-input:focus { outline: none; border-color: #C8D8F0; box-shadow: 0 0 0 2px rgba(90,122,181,0.16); }
+
+        .rag-scrollarea::-webkit-scrollbar { width: 4px; }
+        .rag-scrollarea::-webkit-scrollbar-track { background: transparent; }
+        .rag-scrollarea::-webkit-scrollbar-thumb { background: #E8E6E0; border-radius: 99px; }
+        .rag-scrollarea::-webkit-scrollbar-thumb:hover { background: #C8C6BF; }
+
+        .dot-grid-rag {
+          background-image: radial-gradient(circle, #D0CEC8 1px, transparent 1px);
+          background-size: 28px 28px;
+        }
+      `}</style>
+
+      <header
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 20,
+          height: 64,
+          backgroundColor: 'rgba(245,244,240,0.88)',
+          backdropFilter: 'blur(12px)',
+          borderBottom: '1px solid #E8E6E0',
+          padding: '0 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              background: '#1A1916',
+              borderRadius: 10,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ color: '#F5F4F0', fontSize: 13, fontWeight: 800, fontFamily: 'DM Serif Display, serif' }}>
+              C
+            </span>
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <h1 className="rag-wordmark" style={{ fontSize: 20, fontWeight: 400, letterSpacing: '-0.02em', lineHeight: 1 }}>
+              RAG Workspace
+            </h1>
+            <p style={{ fontSize: 11, color: '#9E9B94', fontWeight: 500, marginTop: 2 }}>Ingest notes, query context, and review answers</p>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Button asChild variant="outline" className="rag-btn-ghost">
+            <Link href="/student">Back to student</Link>
+          </Button>
+          <button
+            className="rag-btn-ghost"
+            onClick={() => void loadDocuments(activeDocumentId || undefined)}
+            disabled={isLoadingDocuments}
+          >
+            <RefreshCw size={14} className={isLoadingDocuments ? 'animate-spin' : ''} />
+            Refresh Docs
+          </button>
+        </div>
+      </header>
+
+      <main style={{ position: 'relative', padding: '24px' }}>
+        <div
+          className="dot-grid-rag"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 220,
+            opacity: 0.3,
+            pointerEvents: 'none',
+            maskImage: 'linear-gradient(to bottom, black 0%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, black 0%, transparent 100%)',
+          }}
+        />
+
+        <div
+          style={{
+            maxWidth: 1180,
+            margin: '0 auto',
+            display: 'grid',
+            gridTemplateColumns: 'minmax(320px, 380px) minmax(0, 1fr)',
+            gap: 20,
+            position: 'relative',
+            zIndex: 1,
+          }}
+        >
+          <motion.section
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="rag-card"
+            style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}
+          >
+            <div>
+              <span className="rag-tag" style={{ backgroundColor: '#E4ECFB', color: '#5A7AB5' }}>
+                <BookOpen size={12} />
+                Document Setup
+              </span>
+              <p style={{ fontSize: 13, color: '#7A7872', marginTop: 10 }}>
+                Select an uploaded notes document or ingest a fresh one.
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <Button asChild variant="outline" size="sm">
-                <Link href="/student">Go to Student</Link>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => void loadDocuments(activeDocumentId || undefined)}
-                disabled={isLoadingDocuments}
-                className="gap-2"
-              >
-                <RefreshCw className={`h-4 w-4 ${isLoadingDocuments ? 'animate-spin' : ''}`} />
-                Refresh Docs
-              </Button>
-            </div>
-          </header>
 
-          <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-50/20">
-            <div className="mx-auto grid w-full max-w-6xl gap-6 lg:grid-cols-[360px_1fr]">
-              <Card className="border border-app-border bg-white shadow-sm">
-                <CardHeader>
-                  <CardTitle className="text-xl">Document Setup</CardTitle>
-                  <p className="text-sm text-app-muted">Choose an uploaded document or ingest a new one.</p>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {workflowSteps.map((step) => (
-                    <div
-                      key={step.id}
-                      className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm ${
-                        step.done
-                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                          : 'border-app-border bg-neutral-50 text-app-muted'
-                      }`}
-                    >
-                      <span>
-                        {step.id}. {step.label}
-                      </span>
-                      <span className="text-xs font-semibold uppercase">{step.done ? 'Done' : 'Pending'}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {workflowSteps.map((step) => (
+                <div
+                  key={step.id}
+                  style={{
+                    borderRadius: 12,
+                    border: `1.5px solid ${step.done ? '#B8DEC9' : '#E8E6E0'}`,
+                    backgroundColor: step.done ? '#E2F5EA' : '#F5F4F0',
+                    color: step.done ? '#4A9068' : '#7A7872',
+                    padding: '10px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 8,
+                    fontSize: 12,
+                    fontWeight: 600,
+                  }}
+                >
+                  <span>{step.id}. {step.label}</span>
+                  <span style={{ fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    {step.done ? 'Done' : 'Pending'}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9E9B94' }}>
+                Uploaded Documents
+              </label>
+              <Select
+                value={selectedDocumentId}
+                onValueChange={(value) => {
+                  setSelectedDocumentId(value);
+                  setIngestResult(null);
+                }}
+                disabled={isLoadingDocuments || notesDocuments.length === 0}
+              >
+                <SelectTrigger style={{ height: 40, border: '1.5px solid #E8E6E0', borderRadius: 10, background: '#F5F4F0' }}>
+                  <SelectValue
+                    placeholder={
+                      isLoadingDocuments
+                        ? 'Loading uploaded documents...'
+                        : notesDocuments.length === 0
+                          ? 'No uploaded notes found yet'
+                          : 'Select uploaded document'
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {notesDocuments.map((item) => (
+                    <SelectItem key={item.document_id} value={item.document_id}>
+                      {(item.document_name || item.document_id).slice(0, 56)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {documentsError && <p style={{ color: '#C06060', fontSize: 12 }}>{documentsError}</p>}
+            </div>
+
+            {selectedDocumentId && !ingestResult && (
+              <div
+                style={{
+                  borderRadius: 12,
+                  border: '1.5px solid #C8D8F0',
+                  backgroundColor: '#E4ECFB',
+                  color: '#5A7AB5',
+                  padding: '10px 12px',
+                  fontSize: 12,
+                }}
+              >
+                <p style={{ fontWeight: 700, marginBottom: 4 }}>Using existing uploaded document</p>
+                <p style={{ wordBreak: 'break-all' }}>{selectedDocumentId}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleIngest} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9E9B94' }}>
+                  Notes PDF URL
+                </label>
+                <Input
+                  className="rag-input"
+                  placeholder="https://example.com/notes.pdf"
+                  value={pdfUrl}
+                  onChange={(event) => setPdfUrl(event.target.value)}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9E9B94' }}>
+                  Subject (optional)
+                </label>
+                <Input
+                  className="rag-input"
+                  placeholder="Data Structures"
+                  value={subject}
+                  onChange={(event) => setSubject(event.target.value)}
+                />
+              </div>
+
+              <button type="submit" disabled={isIngesting || !pdfUrl.trim()} className="rag-btn-dark">
+                {isIngesting ? 'Ingesting...' : 'Ingest Notes'}
+              </button>
+            </form>
+
+            {ingestError && (
+              <p
+                style={{
+                  borderRadius: 12,
+                  border: '1.5px solid #F0C0C0',
+                  backgroundColor: '#FDE8E8',
+                  color: '#C06060',
+                  padding: '10px 12px',
+                  fontSize: 12,
+                }}
+              >
+                {ingestError}
+              </p>
+            )}
+
+            {ingestResult && (
+              <div
+                style={{
+                  borderRadius: 12,
+                  border: '1.5px solid #B8DEC9',
+                  backgroundColor: '#E2F5EA',
+                  color: '#4A9068',
+                  padding: '10px 12px',
+                  fontSize: 12,
+                }}
+              >
+                <p style={{ fontWeight: 700 }}>Ready to chat</p>
+                <p>Document ID: {ingestResult.document_id}</p>
+                <p>Chunks: {ingestResult.chunk_count} • Vectors: {ingestResult.vector_count}</p>
+              </div>
+            )}
+          </motion.section>
+
+          <motion.section
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.05 }}
+            className="rag-card"
+            style={{ padding: 20, display: 'flex', flexDirection: 'column', minHeight: 640 }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+              <div>
+                <span className="rag-tag" style={{ backgroundColor: '#E2F5EA', color: '#4A9068' }}>
+                  <MessageSquare size={12} />
+                  Chat With Notes
+                </span>
+                <p style={{ fontSize: 13, color: '#7A7872', marginTop: 10 }}>
+                  Ask your selected document and choose how detailed the answer should be.
+                </p>
+              </div>
+
+              <div style={{ minWidth: 150 }}>
+                <Select value={style} onValueChange={(value) => setStyle(value as QueryStyle)}>
+                  <SelectTrigger style={{ height: 36, border: '1.5px solid #E8E6E0', borderRadius: 10, background: '#F5F4F0' }}>
+                    <SelectValue placeholder="Answer style" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="brief">Brief</SelectItem>
+                    <SelectItem value="detailed">Detailed</SelectItem>
+                    <SelectItem value="bullets">Bullets</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div
+              style={{
+                borderRadius: 14,
+                border: '1.5px solid #E8E6E0',
+                backgroundColor: '#F5F4F0',
+                padding: '10px 12px',
+                marginBottom: 12,
+              }}
+            >
+              <p style={{ fontSize: 10, color: '#9E9B94', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                Active Document
+              </p>
+              <p style={{ fontSize: 12, fontWeight: 600, color: '#1A1916', marginTop: 4, wordBreak: 'break-all' }}>
+                {activeDocumentId || 'No document selected'}
+              </p>
+            </div>
+
+            <div
+              className="rag-scrollarea"
+              style={{
+                flex: 1,
+                borderRadius: 16,
+                border: '1.5px solid #E8E6E0',
+                backgroundColor: '#F5F4F0',
+                padding: 12,
+                overflowY: 'auto',
+                minHeight: 320,
+                maxHeight: 460,
+              }}
+            >
+              {chat.length === 0 ? (
+                <div style={{ height: '100%', display: 'grid', placeItems: 'center', textAlign: 'center', color: '#9E9B94' }}>
+                  <div>
+                    <Sparkles size={20} style={{ margin: '0 auto 8px', opacity: 0.8 }} />
+                    <p style={{ fontSize: 13 }}>No messages yet</p>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {chat.map((message, index) => (
+                    <div key={`${message.role}-${index}`} style={{ display: 'flex', flexDirection: 'column', alignItems: message.role === 'user' ? 'flex-end' : 'flex-start', gap: 6 }}>
+                      <div
+                        style={{
+                          maxWidth: '88%',
+                          borderRadius: 12,
+                          padding: '10px 12px',
+                          fontSize: 13,
+                          lineHeight: 1.6,
+                          border: message.role === 'user' ? 'none' : '1.5px solid #E8E6E0',
+                          backgroundColor: message.role === 'user' ? '#1A1916' : '#FDFCF9',
+                          color: message.role === 'user' ? '#F5F4F0' : '#1A1916',
+                        }}
+                      >
+                        {message.role === 'assistant' ? (
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                              p: ({ children }) => <p style={{ marginBottom: 8 }}>{children}</p>,
+                              ul: ({ children }) => <ul style={{ marginBottom: 8, paddingLeft: 20, listStyle: 'disc' }}>{children}</ul>,
+                              ol: ({ children }) => <ol style={{ marginBottom: 8, paddingLeft: 20, listStyle: 'decimal' }}>{children}</ol>,
+                              li: ({ children }) => <li style={{ marginBottom: 4 }}>{children}</li>,
+                              strong: ({ children }) => <strong style={{ fontWeight: 700 }}>{children}</strong>,
+                              code: ({ children }) => (
+                                <code style={{ borderRadius: 6, background: '#F5F4F0', padding: '2px 6px', fontSize: '0.9em' }}>{children}</code>
+                              ),
+                              pre: ({ children }) => (
+                                <pre style={{ marginBottom: 8, overflowX: 'auto', borderRadius: 8, background: '#F5F4F0', padding: 10, fontSize: '0.9em' }}>
+                                  {children}
+                                </pre>
+                              ),
+                            }}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
+                        ) : (
+                          message.content
+                        )}
+                      </div>
+
+                      {message.role === 'assistant' && typeof message.usedGeminiFallback === 'boolean' && (
+                        <Badge
+                          variant="outline"
+                          className={
+                            message.usedGeminiFallback
+                              ? 'border-[#F0C0C0] bg-[#FDE8E8] text-[#C06060]'
+                              : 'border-[#B8DEC9] bg-[#E2F5EA] text-[#4A9068]'
+                          }
+                        >
+                          {message.usedGeminiFallback ? 'Gemini fallback used' : 'Indexed notes answer'}
+                        </Badge>
+                      )}
                     </div>
                   ))}
-
-                  <div className="space-y-1">
-                    <label className="text-sm font-medium text-app-text">Uploaded Documents</label>
-                    <Select
-                      value={selectedDocumentId}
-                      onValueChange={(value) => {
-                        setSelectedDocumentId(value);
-                        setIngestResult(null);
-                      }}
-                      disabled={isLoadingDocuments || notesDocuments.length === 0}
-                    >
-                      <SelectTrigger className="w-full h-10">
-                        <SelectValue
-                          placeholder={
-                            isLoadingDocuments
-                              ? 'Loading uploaded documents...'
-                              : notesDocuments.length === 0
-                                ? 'No uploaded notes found yet'
-                                : 'Select uploaded document'
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {notesDocuments.map((item) => (
-                          <SelectItem key={item.document_id} value={item.document_id}>
-                            {(item.document_name || item.document_id).slice(0, 56)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {documentsError && <p className="text-xs text-red-600">{documentsError}</p>}
-                  </div>
-
-                  {selectedDocumentId && !ingestResult && (
-                    <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
-                      <p className="font-medium">Using existing uploaded document.</p>
-                      <p>Document ID: {selectedDocumentId}</p>
-                    </div>
-                  )}
-
-                  <form onSubmit={handleIngest} className="space-y-3 pt-2">
-                    <div className="space-y-1">
-                      <label className="text-sm font-medium text-app-text">Notes PDF URL</label>
-                      <Input
-                        placeholder="https://example.com/notes.pdf"
-                        value={pdfUrl}
-                        onChange={(event) => setPdfUrl(event.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-sm font-medium text-app-text">Subject (optional)</label>
-                      <Input
-                        placeholder="Data Structures"
-                        value={subject}
-                        onChange={(event) => setSubject(event.target.value)}
-                      />
-                    </div>
-                    <Button
-                      type="submit"
-                      disabled={isIngesting || !pdfUrl.trim()}
-                      className="w-full bg-black text-white hover:bg-neutral-800"
-                    >
-                      {isIngesting ? 'Ingesting...' : 'Ingest Notes'}
-                    </Button>
-                  </form>
-
-                  {ingestError && (
-                    <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                      {ingestError}
-                    </p>
-                  )}
-
-                  {ingestResult && (
-                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                      <p className="font-medium">Ready to chat.</p>
-                      <p>Document ID: {ingestResult.document_id}</p>
-                      <p>
-                        Chunks: {ingestResult.chunk_count} • Vectors: {ingestResult.vector_count}
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="border border-app-border bg-white shadow-sm">
-                <CardHeader>
-                  <CardTitle className="text-xl">Chat With Notes</CardTitle>
-                  <p className="text-sm text-app-muted">Choose answer style and ask questions against the selected document.</p>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between gap-4 rounded-lg border border-app-border bg-neutral-50 px-3 py-2">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-app-muted">Active Document</p>
-                      <p className="text-sm font-medium text-app-text truncate max-w-65">
-                        {activeDocumentId || 'No document selected'}
-                      </p>
-                    </div>
-                    <div className="min-w-37.5">
-                      <Select value={style} onValueChange={(value) => setStyle(value as QueryStyle)}>
-                        <SelectTrigger className="w-full h-9 bg-white">
-                          <SelectValue placeholder="Answer style" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="brief">Brief</SelectItem>
-                          <SelectItem value="detailed">Detailed</SelectItem>
-                          <SelectItem value="bullets">Bullets</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="h-115 overflow-y-auto rounded-lg border border-app-border bg-neutral-50 p-4">
-                    {chat.length === 0 ? (
-                      <p className="text-sm text-app-muted">No messages yet.</p>
-                    ) : (
-                      <div className="space-y-3">
-                        {chat.map((message, index) => (
-                          <div key={`${message.role}-${index}`} className="space-y-1">
-                            <div
-                              className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
-                                message.role === 'user'
-                                  ? 'ml-auto bg-black text-white'
-                                  : 'bg-white text-app-text border border-app-border'
-                              }`}
-                            >
-                              {message.role === 'assistant' ? (
-                                <ReactMarkdown
-                                  remarkPlugins={[remarkGfm]}
-                                  components={{
-                                    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                                    ul: ({ children }) => <ul className="mb-2 list-disc pl-5 last:mb-0">{children}</ul>,
-                                    ol: ({ children }) => <ol className="mb-2 list-decimal pl-5 last:mb-0">{children}</ol>,
-                                    li: ({ children }) => <li className="mb-1 last:mb-0">{children}</li>,
-                                    strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                                    code: ({ children }) => (
-                                      <code className="rounded bg-neutral-100 px-1 py-0.5 text-[0.9em]">{children}</code>
-                                    ),
-                                    pre: ({ children }) => (
-                                      <pre className="mb-2 overflow-x-auto rounded bg-neutral-100 p-2 text-[0.9em] last:mb-0">
-                                        {children}
-                                      </pre>
-                                    ),
-                                  }}
-                                >
-                                  {message.content}
-                                </ReactMarkdown>
-                              ) : (
-                                message.content
-                              )}
-                            </div>
-                            {message.role === 'assistant' && typeof message.usedGeminiFallback === 'boolean' && (
-                              <div className="max-w-[85%]">
-                                <Badge
-                                  variant="outline"
-                                  className={
-                                    message.usedGeminiFallback
-                                      ? 'border-amber-200 bg-amber-50 text-amber-700'
-                                      : 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                  }
-                                >
-                                  {message.usedGeminiFallback ? 'Gemini fallback used' : 'Indexed notes answer'}
-                                </Badge>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <form onSubmit={handleAsk} className="flex gap-2">
-                    <Input
-                      value={question}
-                      onChange={(event) => setQuestion(event.target.value)}
-                      placeholder={isReady ? 'Ask a question about your notes...' : 'Select or ingest notes first...'}
-                      disabled={!isReady || isAsking}
-                      required
-                    />
-                    <Button
-                      type="submit"
-                      disabled={!isReady || isAsking || !question.trim()}
-                      className="bg-black text-white hover:bg-neutral-800"
-                    >
-                      {isAsking ? 'Asking...' : 'Ask'}
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
+                </div>
+              )}
             </div>
-          </div>
+
+            <form onSubmit={handleAsk} style={{ marginTop: 12, display: 'flex', gap: 10 }}>
+              <Input
+                className="rag-input"
+                value={question}
+                onChange={(event) => setQuestion(event.target.value)}
+                placeholder={isReady ? 'Ask a question about your notes...' : 'Select or ingest notes first...'}
+                disabled={!isReady || isAsking}
+                required
+              />
+              <button
+                type="submit"
+                className="rag-btn-dark"
+                style={{ minWidth: 94, padding: '0 16px' }}
+                disabled={!isReady || isAsking || !question.trim()}
+              >
+                {isAsking ? 'Asking...' : 'Ask'}
+              </button>
+            </form>
+          </motion.section>
         </div>
       </main>
     </div>

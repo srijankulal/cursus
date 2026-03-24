@@ -5,6 +5,7 @@ import { connectToDatabase } from '@/lib/mongoose';
 import { SESSION_COOKIE_NAME, SESSION_USER_ID_COOKIE_NAME, isSessionRole } from '@/lib/auth/session';
 import { Hod } from '@/models/hod';
 import { Faculty } from '@/models/faculty';
+import '@/models/user';
 
 export async function GET(request: NextRequest) {
   try {
