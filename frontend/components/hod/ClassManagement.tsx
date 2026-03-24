@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,11 @@ interface Class {
   capacity: number;
   classGuide: { _id: string; name: string; email: string };
   faculties: Array<{ _id: string; name: string; email: string }>;
+  courseAssignments?: Array<{
+    subjectId: string;
+    subjectName: string;
+    faculty: string | { _id: string; name?: string; email?: string };
+  }>;
   students?: Array<{ _id: string; rollNumber: string }>;
 }
 
@@ -24,13 +29,50 @@ interface Faculty {
   email: string;
 }
 
+interface Course {
+  id: string;
+  name: string;
+}
+
 export function ClassManagement() {
   const [classes, setClasses] = useState<Class[]>([]);
   const [faculties, setFaculties] = useState<Faculty[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [courseAssignments, setCourseAssignments] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const isValidObjectId = (value: string | null | undefined) =>
+    Boolean(value && /^[a-fA-F0-9]{24}$/.test(value));
+
+  const resolveUserId = useCallback(async () => {
+    const localUserId = localStorage.getItem('userId');
+
+    if (isValidObjectId(localUserId)) {
+      return localUserId as string;
+    }
+
+    if (localUserId) {
+      localStorage.removeItem('userId');
+    }
+
+    const sessionRes = await fetch('/api/auth/session');
+    if (!sessionRes.ok) {
+      return null;
+    }
+
+    const sessionData = await sessionRes.json();
+    const sessionUserId = sessionData.userId as string | null;
+
+    if (isValidObjectId(sessionUserId)) {
+      localStorage.setItem('userId', sessionUserId as string);
+      return sessionUserId as string;
+    }
+
+    return null;
+  }, []);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -38,29 +80,82 @@ export function ClassManagement() {
     semester: '1',
     capacity: '',
     classGuide: '',
-    faculties: [] as string[],
   });
+
+  const fetchCoursesForSemester = async (semester: string) => {
+    const response = await fetch(`/api/hod/courses?semester=${semester}`);
+
+    if (!response.ok) {
+      setCourses([]);
+      setCourseAssignments({});
+      return;
+    }
+
+    const data = await response.json();
+    const semesterCourses: Course[] = Array.isArray(data.courses) ? data.courses : [];
+
+    setCourses(semesterCourses);
+    setCourseAssignments((prev) => {
+      const next: Record<string, string> = {};
+
+      semesterCourses.forEach((course) => {
+        if (prev[course.id]) {
+          next[course.id] = prev[course.id];
+        }
+      });
+
+      return next;
+    });
+  };
+
+  const fetchClassesFromDb = async (userId: string | null) => {
+    const headers: HeadersInit = {};
+    if (userId) {
+      headers['x-user-id'] = userId;
+    }
+
+    const classRes = await fetch('/api/hod/classes', { headers });
+
+    if (!classRes.ok) {
+      const errorData = await classRes.json().catch(() => ({}));
+      setClasses([]);
+      return {
+        ok: false as const,
+        message: errorData.message || 'Unable to load classes from database.',
+      };
+    }
+
+    const data = await classRes.json();
+    setClasses(Array.isArray(data.classes) ? data.classes : []);
+    return { ok: true as const };
+  };
 
   // Fetch classes and faculties
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const userId = localStorage.getItem('userId');
+        const userId = await resolveUserId();
         
-        const classRes = await fetch('/api/hod/classes', {
-          headers: { 'x-user-id': userId || '' },
-        });
-        
-        if (classRes.ok) {
-          const data = await classRes.json();
-          setClasses(data.classes);
+        const classesResult = await fetchClassesFromDb(userId);
+        if (!classesResult.ok) {
+          setFeedback({ type: 'error', message: classesResult.message });
         }
 
+        await fetchCoursesForSemester('1');
+
         // Fetch available faculties (you'll need to create this endpoint)
-        const facultyRes = await fetch('/api/hod/faculties');
+        const facultyRes = await fetch('/api/hod/faculties', {
+          headers: userId ? { 'x-user-id': userId } : {},
+        });
         if (facultyRes.ok) {
           const data = await facultyRes.json();
-          setFaculties(data.faculties);
+          setFaculties(Array.isArray(data.faculties) ? data.faculties : []);
+        } else {
+          const errorData = await facultyRes.json().catch(() => ({}));
+          setFeedback({
+            type: 'error',
+            message: errorData.message || 'Unable to load faculties for this HOD account.',
+          });
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -71,7 +166,19 @@ export function ClassManagement() {
     };
 
     fetchData();
-  }, []);
+  }, [resolveUserId]);
+
+  const handleSemesterChange = async (semester: string) => {
+    setFormData((prev) => ({ ...prev, semester }));
+    await fetchCoursesForSemester(semester);
+  };
+
+  const handleCourseFacultyChange = (courseId: string, facultyId: string) => {
+    setCourseAssignments((prev) => ({
+      ...prev,
+      [courseId]: facultyId,
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,8 +189,25 @@ export function ClassManagement() {
       return;
     }
 
+    if (courses.length === 0) {
+      setFeedback({ type: 'error', message: 'No courses found for the selected semester.' });
+      return;
+    }
+
+    const assignmentPayload = courses.map((course) => ({
+      subjectId: course.id,
+      subjectName: course.name,
+      faculty: courseAssignments[course.id],
+    }));
+
+    const hasMissingCourseFaculty = assignmentPayload.some((item) => !item.faculty);
+    if (hasMissingCourseFaculty) {
+      setFeedback({ type: 'error', message: 'Assign a faculty to each course before saving.' });
+      return;
+    }
+
     try {
-      const userId = localStorage.getItem('userId');
+      const userId = await resolveUserId();
       const method = editingId ? 'PUT' : 'POST';
       const url = editingId ? `/api/hod/classes/${editingId}` : '/api/hod/classes';
 
@@ -91,14 +215,14 @@ export function ClassManagement() {
         method,
         headers: {
           'Content-Type': 'application/json',
-          'x-user-id': userId || '',
+          ...(userId ? { 'x-user-id': userId } : {}),
         },
         body: JSON.stringify({
           name: formData.name,
           semester: parseInt(formData.semester),
           capacity: parseInt(formData.capacity),
           classGuide: formData.classGuide,
-          faculties: formData.faculties.length > 0 ? formData.faculties : [formData.classGuide],
+          courseAssignments: assignmentPayload,
         }),
       });
 
@@ -109,11 +233,12 @@ export function ClassManagement() {
         return;
       }
 
+      const classesResult = await fetchClassesFromDb(userId);
+      if (!classesResult.ok) {
+        setFeedback({ type: 'error', message: classesResult.message });
+      }
       if (editingId) {
-        setClasses(classes.map(c => c._id === editingId ? data.class : c));
         setEditingId(null);
-      } else {
-        setClasses([...classes, data.class]);
       }
 
       setFeedback({ type: 'success', message: editingId ? 'Class updated' : 'Class created' });
@@ -129,15 +254,22 @@ export function ClassManagement() {
     if (!confirm('Are you sure you want to delete this class?')) return;
 
     try {
-      const userId = localStorage.getItem('userId');
+      const userId = await resolveUserId();
       const response = await fetch(`/api/hod/classes/${id}`, {
         method: 'DELETE',
-        headers: { 'x-user-id': userId || '' },
+        headers: userId ? { 'x-user-id': userId } : {},
       });
 
       if (response.ok) {
-        setClasses(classes.filter(c => c._id !== id));
+        const classesResult = await fetchClassesFromDb(userId);
+        if (!classesResult.ok) {
+          setFeedback({ type: 'error', message: classesResult.message });
+          return;
+        }
         setFeedback({ type: 'success', message: 'Class deleted' });
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        setFeedback({ type: 'error', message: errorData.message || 'Failed to delete class' });
       }
     } catch (error) {
       console.error('Error:', error);
@@ -146,13 +278,26 @@ export function ClassManagement() {
   };
 
   const handleEdit = (classItem: Class) => {
+    const nextAssignments: Record<string, string> = {};
+
+    (classItem.courseAssignments ?? []).forEach((assignment) => {
+      const assignedFaculty = assignment.faculty;
+      if (typeof assignedFaculty === 'string') {
+        nextAssignments[assignment.subjectId] = assignedFaculty;
+      } else if (assignedFaculty?._id) {
+        nextAssignments[assignment.subjectId] = assignedFaculty._id;
+      }
+    });
+
     setFormData({
       name: classItem.name,
       semester: classItem.semester.toString(),
       capacity: classItem.capacity.toString(),
       classGuide: classItem.classGuide._id,
-      faculties: classItem.faculties.map(f => f._id),
     });
+
+    setCourseAssignments(nextAssignments);
+    void fetchCoursesForSemester(classItem.semester.toString());
     setEditingId(classItem._id);
     setShowForm(true);
   };
@@ -163,25 +308,11 @@ export function ClassManagement() {
       semester: '1',
       capacity: '',
       classGuide: '',
-      faculties: [],
     });
+    setCourses([]);
+    setCourseAssignments({});
+    void fetchCoursesForSemester('1');
     setEditingId(null);
-  };
-
-  const handleAddFaculty = (facultyId: string) => {
-    if (!formData.faculties.includes(facultyId)) {
-      setFormData({
-        ...formData,
-        faculties: [...formData.faculties, facultyId],
-      });
-    }
-  };
-
-  const handleRemoveFaculty = (facultyId: string) => {
-    setFormData({
-      ...formData,
-      faculties: formData.faculties.filter(f => f !== facultyId),
-    });
   };
 
   if (loading) {
@@ -244,7 +375,7 @@ export function ClassManagement() {
 
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium text-slate-700">Semester *</label>
-                    <Select value={formData.semester} onValueChange={(v) => setFormData({ ...formData, semester: v })}>
+                    <Select value={formData.semester} onValueChange={(v) => void handleSemesterChange(v)}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -285,43 +416,37 @@ export function ClassManagement() {
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-slate-700">Additional Faculties</label>
-                  <div className="space-y-2">
-                    <Select onValueChange={handleAddFaculty} value="">
-                      <SelectTrigger>
-                        <SelectValue placeholder="Add more faculties" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {faculties
-                          .filter(f => !formData.faculties.includes(f._id) && f._id !== formData.classGuide)
-                          .map(f => (
-                            <SelectItem key={f._id} value={f._id}>
-                              {f.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                <div className="space-y-3">
+                  <label className="text-sm font-medium text-slate-700">Course Faculty Assignment *</label>
 
-                    {formData.faculties.length > 0 && (
-                      <div className="flex flex-wrap gap-2 pt-2">
-                        {formData.faculties.map(fId => {
-                          const faculty = faculties.find(f => f._id === fId);
-                          return (
-                            <button
-                              key={fId}
-                              type="button"
-                              onClick={() => handleRemoveFaculty(fId)}
-                              className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm hover:bg-blue-200"
-                            >
-                              {faculty?.name}
-                              <span>×</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
+                  {courses.length === 0 ? (
+                    <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                      No courses available for Semester {formData.semester}.
+                    </p>
+                  ) : (
+                    <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      {courses.map((course) => (
+                        <div key={course.id} className="grid grid-cols-1 gap-2 md:grid-cols-2 md:items-center">
+                          <p className="text-sm font-medium text-slate-700">{course.name}</p>
+                          <Select
+                            value={courseAssignments[course.id] ?? ''}
+                            onValueChange={(facultyId) => handleCourseFacultyChange(course.id, facultyId)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Assign faculty" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {faculties.map((faculty) => (
+                                <SelectItem key={`${course.id}-${faculty._id}`} value={faculty._id}>
+                                  {faculty.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex gap-3 pt-4">
@@ -394,6 +519,10 @@ export function ClassManagement() {
                 <div>
                   <span className="text-slate-500">Faculties:</span>
                   <p className="text-xs text-slate-600 mt-1">{classItem.faculties.length} assigned</p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Course Assignments:</span>
+                  <p className="text-xs text-slate-600 mt-1">{classItem.courseAssignments?.length ?? 0} courses mapped</p>
                 </div>
                 {classItem.students && (
                   <div>

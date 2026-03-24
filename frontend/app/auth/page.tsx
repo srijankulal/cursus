@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type AuthMode = 'login' | 'signup';
 type Role = 'hod' | 'staff' | 'students';
@@ -31,16 +32,34 @@ const roleDescription: Record<Role, string> = {
   students: 'Continue your syllabus tracking and study planning journey.',
 };
 
+
 export default function AuthPage() {
   const router = useRouter();
+
   const [mode, setMode] = useState<AuthMode>('login');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<Role>('students');
+
+  type SignupClassOption = {
+    id: string;
+    name: string;
+    semester: number;
+    department?: string;
+  };
+
+  const [semester, setSemester] = useState('1');
+  const [rollNumber, setRollNumber] = useState('');
+  const [classId, setClassId] = useState('');
+  const [classOptions, setClassOptions] = useState<SignupClassOption[]>([]);
+  const [classesLoading, setClassesLoading] = useState(false);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [feedbackType, setFeedbackType] = useState<'success' | 'error' | null>(null);
+
+  const isStudentSignup = mode === 'signup' && role === 'students';
 
   const title = useMemo(
     () => (mode === 'login' ? 'Welcome back to Cursus' : 'Create your Cursus account'),
@@ -51,6 +70,53 @@ export default function AuthPage() {
     const prefix = mode === 'login' ? 'Log in as' : 'Sign up as';
     return `${prefix} ${roleOptions.find((option) => option.value === role)?.label}. ${roleDescription[role]}`;
   }, [mode, role]);
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSignupClasses() {
+      if (!isStudentSignup) {
+        setClassOptions([]);
+        setClassId('');
+        return;
+      }
+
+      setClassesLoading(true);
+      try {
+        const response = await fetch(`/api/auth/signup/classes?semester=${semester}`);
+        const data = await response.json();
+
+        if (!response.ok || !data?.ok) {
+          if (!cancelled) setClassOptions([]);
+          return;
+        }
+
+        const next = Array.isArray(data.classes) ? data.classes : [];
+        if (!cancelled) {
+          setClassOptions(next);
+          if (classId && !next.some((c: SignupClassOption) => c.id === classId)) {
+            setClassId('');
+          }
+        }
+      } catch {
+        if (!cancelled) setClassOptions([]);
+      } finally {
+        if (!cancelled) setClassesLoading(false);
+      }
+    }
+
+    loadSignupClasses();
+    return () => {
+      cancelled = true;
+    };
+  }, [isStudentSignup, semester, classId]);
+    useEffect(() => {
+    if (!isStudentSignup) {
+      setSemester('1');
+      setRollNumber('');
+      setClassId('');
+      setClassOptions([]);
+    }
+  }, [isStudentSignup]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -63,7 +129,19 @@ export default function AuthPage() {
       const payload =
         mode === 'login'
           ? { email, password, role }
-          : { name, email, password, role };
+          : {
+              name,
+              email,
+              password,
+              role,
+              ...(role === 'students'
+                ? {
+                    semester: Number(semester),
+                    rollNumber: rollNumber.trim(),
+                    classId: classId || undefined,
+                  }
+                : {}),
+            };
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -214,6 +292,66 @@ export default function AuthPage() {
                   required
                 />
               </div>
+                            {isStudentSignup && (
+                <>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-app-text">Semester</label>
+                    <Select
+                      value={semester}
+                      onValueChange={(value) => {
+                        setSemester(value);
+                        setClassId('');
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select semester" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1, 2, 3, 4, 5, 6].map((s) => (
+                          <SelectItem key={s} value={String(s)}>
+                            Semester {s}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-app-text" htmlFor="rollNumber">
+                      Roll number
+                    </label>
+                    <Input
+                      id="rollNumber"
+                      value={rollNumber}
+                      onChange={(event) => setRollNumber(event.target.value)}
+                      placeholder="e.g., BCA23-042"
+                      required={isStudentSignup}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-app-text">Class (optional)</label>
+                    <Select
+                      value={classId || 'none'}
+                      onValueChange={(value) => setClassId(value === 'none' ? '' : value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue
+                          placeholder={classesLoading ? 'Loading classes...' : 'Select class (optional)'}
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No class selected</SelectItem>
+                        {classOptions.map((cls) => (
+                          <SelectItem key={cls.id} value={cls.id}>
+                            {cls.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
 
               {feedback && (
                 <p
