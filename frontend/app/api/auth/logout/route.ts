@@ -1,12 +1,22 @@
 import { NextResponse } from 'next/server';
 
-import { SESSION_COOKIE_NAME } from '@/lib/auth/session';
+import { SESSION_COOKIE_NAME, SESSION_USER_ID_COOKIE_NAME } from '@/lib/auth/session';
 
 export async function POST() {
   const response = NextResponse.json({ ok: true, message: 'Logged out successfully.' });
 
   response.cookies.set({
     name: SESSION_COOKIE_NAME,
+    value: '',
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: 0,
+  });
+
+  response.cookies.set({
+    name: SESSION_USER_ID_COOKIE_NAME,
     value: '',
     httpOnly: true,
     sameSite: 'lax',

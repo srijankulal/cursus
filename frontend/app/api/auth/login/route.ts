@@ -3,7 +3,7 @@ import { compare } from 'bcryptjs';
 
 import { connectToDatabase } from '@/lib/mongoose';
 import User from '@/models/user';
-import { SESSION_COOKIE_NAME } from '@/lib/auth/session';
+import { SESSION_COOKIE_NAME, SESSION_USER_ID_COOKIE_NAME } from '@/lib/auth/session';
 import {
   normalizeEmail,
   validateLoginInput,
@@ -46,6 +46,16 @@ export async function POST(request: Request) {
     response.cookies.set({
       name: SESSION_COOKIE_NAME,
       value: user.role,
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7,
+    });
+
+    response.cookies.set({
+      name: SESSION_USER_ID_COOKIE_NAME,
+      value: user._id.toString(),
       httpOnly: true,
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',

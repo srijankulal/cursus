@@ -24,7 +24,7 @@ const CustomTooltip = ({ active, payload }: any) => {
 
 export const SubjectChart = () => (
   <div className="h-[300px] w-full mt-4">
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={280}>
       <BarChart data={data} margin={{ top: 0, right: 30, left: -20, bottom: 0 }}>
         <XAxis 
           dataKey="name" 

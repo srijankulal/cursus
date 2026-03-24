@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { syllabus } from '@/data/syllabus';
+import { useSyllabus } from '@/lib/hooks/use-syllabus';
 import { askAIChat } from '@/lib/gemini';
 import { Send, Bot, User, Sparkles } from 'lucide-react';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -15,18 +15,22 @@ export const AskAI = () => {
   const [topicId, setTopicId] = useState('');
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [chatLoading, setChatLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { semester: sem, loading, error } = useSyllabus(6);
 
-  const sem = syllabus[0];
-  const allTopics = sem.subjects.flatMap(s =>
+  const allTopics = sem ? sem.subjects.flatMap(s => 
     s.units.flatMap(u => u.topics.map(t => ({ ...t, subject: s.name, unit: u.name })))
-  );
+  ) : [];
   const currentTopic = allTopics.find(t => t.id === topicId);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages, loading]);
+  }, [messages, chatLoading]);
+
+  if (loading) return <div className="p-10 text-center animate-pulse text-app-muted uppercase tracking-[0.2em] font-bold">Initializing AI Assistant...</div>;
+  if (error || !sem) return <div className="p-10 text-center text-rose-500 font-bold uppercase tracking-[0.2em]">Error loading assistant</div>;
+
 
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +39,7 @@ export const AskAI = () => {
     const nextHistory = [...messages, userMsg];
     setMessages(nextHistory);
     setInput('');
-    setLoading(true);
+    setChatLoading(true);
     try {
       const resp = await askAIChat(
         currentTopic!.name, currentTopic!.subject, currentTopic!.unit,
@@ -45,7 +49,7 @@ export const AskAI = () => {
     } catch {
       setMessages([...nextHistory, { role: 'model', content: 'Error contacting Gemini. Check your API key.' }]);
     } finally {
-      setLoading(false);
+      setChatLoading(false);
     }
   };
 
@@ -111,7 +115,7 @@ export const AskAI = () => {
                 )}
               </motion.div>
             ))}
-            {loading && (
+            {chatLoading && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3 items-start">
                 <div className="w-8 h-8 rounded-lg bg-neutral-100 border border-app-border flex items-center justify-center shrink-0">
                   <Bot size={14} className="text-app-muted" />
@@ -132,13 +136,13 @@ export const AskAI = () => {
             type="text"
             value={input}
             onChange={e => setInput(e.target.value)}
-            disabled={!topicId || loading}
+            disabled={!topicId || chatLoading}
             placeholder={topicId ? `Ask about ${currentTopic?.name}…` : 'Select a topic first…'}
             className="flex-1 bg-neutral-50 border border-app-border rounded-lg px-4 py-2 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-neutral-300 placeholder:text-app-muted disabled:opacity-50"
           />
           <Button
             type="submit"
-            disabled={!input.trim() || loading}
+            disabled={!input.trim() || chatLoading}
             size="icon"
             className="bg-black text-white hover:bg-neutral-800 rounded-lg w-10 h-10 shrink-0"
           >

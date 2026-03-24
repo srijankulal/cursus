@@ -7,20 +7,31 @@ export interface Topic {
 
 export interface Unit {
   id: string;
-  name: string;
-  topics: Topic[];
+  unit_number: number;
+  title: string;
+  hours: number;
+  content: string; // The raw content string from the JSON
+  topics: Topic[]; // Derived from parsing content by ". "
   subjectId: string;
 }
 
 export interface Subject {
-  id: string;
-  name: string;
+  id: string; // subject_code
+  subject_code: string;
+  subject_name: string;
+  type: string;
+  credits: number;
+  total_hours: number;
+  exam_marks: number;
+  cie_marks: number;
+  total_marks: number;
   units: Unit[];
-  semesterId: string;
+  semesterNumber: number;
 }
 
 export interface Semester {
-  id: string;
+  id: string; // "sem" + semesterNumber
+  semesterNumber: number;
   name: string;
   subjects: Subject[];
 }
@@ -29,257 +40,176 @@ const today = new Date();
 export const EXAM_DATE_DEFAULT = new Date(today);
 EXAM_DATE_DEFAULT.setDate(today.getDate() + 30);
 
-export const syllabus: Semester[] = [
+/**
+ * Helper to parse the content string into individual topics
+ */
+function parseTopics(content: string, unitId: string): Topic[] {
+  // Split by "." and filter out empty strings
+  return content.split(".").map(s => s.trim()).filter(Boolean).map((topicName, index) => ({
+    id: `${unitId}-t${index + 1}`,
+    name: topicName,
+    isHighYield: topicName.toLowerCase().includes("architecture") || 
+                 topicName.toLowerCase().includes("jdbc") ||
+                 topicName.toLowerCase().includes("servlet") ||
+                 topicName.toLowerCase().includes("machine learning") ||
+                 topicName.toLowerCase().includes("mysql"),
+    unitId
+  }));
+}
+
+const rawData = [
   {
-    id: 'sem3',
-    name: 'Semester 3',
-    subjects: [
+    "semester": 6,
+    "subject_code": "G601DC2.6",
+    "subject_name": "J2EE and Enterprise Java",
+    "type": "DSC",
+    "credits": 3,
+    "total_hours": 48,
+    "exam_marks": 60,
+    "cie_marks": 40,
+    "total_marks": 100,
+    "units": [
       {
-        id: 'ds',
-        name: 'Data Structures',
-        semesterId: 'sem3',
-        units: [
-          {
-            id: 'ds-u1',
-            name: 'Introduction to DS',
-            subjectId: 'ds',
-            topics: [
-              { id: 't1', name: 'Stack', isHighYield: true, unitId: 'ds-u1' },
-              { id: 't2', name: 'Queue', isHighYield: false, unitId: 'ds-u1' },
-              { id: 't3', name: 'Linked List', isHighYield: true, unitId: 'ds-u1' },
-              { id: 't4', name: 'Arrays', isHighYield: false, unitId: 'ds-u1' },
-            ],
-          },
-          {
-            id: 'ds-u2',
-            name: 'Searching & Sorting',
-            subjectId: 'ds',
-            topics: [
-              { id: 't5', name: 'Binary Search', isHighYield: true, unitId: 'ds-u2' },
-              { id: 't6', name: 'Quick Sort', isHighYield: true, unitId: 'ds-u2' },
-              { id: 't7', name: 'Bubble Sort', isHighYield: false, unitId: 'ds-u2' },
-              { id: 't8', name: 'Linear Search', isHighYield: false, unitId: 'ds-u2' },
-            ],
-          },
-          {
-            id: 'ds-u3',
-            name: 'Trees & Graphs',
-            subjectId: 'ds',
-            topics: [
-              { id: 't9', name: 'Binary Trees', isHighYield: true, unitId: 'ds-u3' },
-              { id: 't10', name: 'BFS/DFS', isHighYield: true, unitId: 'ds-u3' },
-              { id: 't11', name: 'Adjacency Matrix', isHighYield: false, unitId: 'ds-u3' },
-              { id: 't12', name: 'Graph Traversal', isHighYield: false, unitId: 'ds-u3' },
-            ],
-          },
-        ],
+        "unit_number": 1,
+        "title": "Introducing J2EE",
+        "hours": 12,
+        "content": "Need for Enterprise Computing. The J2EE Advantage: Platform Independence, Managed Objects, Reusability, Modularity. Enterprise Architecture Types: Single-Tier Systems, 2-Tier Architecture, 3-Tier Architecture, n-Tier Architecture, Architecture of J2EE. Introducing J2EE Runtime and J2EE APIs. Types of J2EE Technologies: Introducing J2EE Components, Containers and Connectors. Introducing J2EE Service Technologies, Introducing J2EE Communication Technologies."
       },
       {
-        id: 'os',
-        name: 'Operating Systems',
-        semesterId: 'sem3',
-        units: [
-          {
-            id: 'os-u1',
-            name: 'OS Concepts',
-            subjectId: 'os',
-            topics: [
-              { id: 't13', name: 'Process Management', isHighYield: true, unitId: 'os-u1' },
-              { id: 't14', name: 'Threads', isHighYield: false, unitId: 'os-u1' },
-              { id: 't15', name: 'Deadlock', isHighYield: true, unitId: 'os-u1' },
-              { id: 't16', name: 'System Calls', isHighYield: false, unitId: 'os-u1' },
-            ],
-          },
-          {
-            id: 'os-u2',
-            name: 'CPU Scheduling',
-            subjectId: 'os',
-            topics: [
-              { id: 't17', name: 'Round Robin', isHighYield: true, unitId: 'os-u2' },
-              { id: 't18', name: 'FCFS', isHighYield: false, unitId: 'os-u2' },
-              { id: 't19', name: 'SJF', isHighYield: true, unitId: 'os-u2' },
-              { id: 't20', name: 'Priority Scheduling', isHighYield: false, unitId: 'os-u2' },
-            ],
-          },
-          {
-            id: 'os-u3',
-            name: 'Memory Management',
-            subjectId: 'os',
-            topics: [
-              { id: 't21', name: 'Paging', isHighYield: true, unitId: 'os-u3' },
-              { id: 't22', name: 'Segmentation', isHighYield: false, unitId: 'os-u3' },
-              { id: 't23', name: 'Virtual Memory', isHighYield: true, unitId: 'os-u3' },
-              { id: 't24', name: 'Fragmentation', isHighYield: false, unitId: 'os-u3' },
-            ],
-          },
-        ],
+        "unit_number": 2,
+        "title": "Java DataBase Connectivity (JDBC)",
+        "hours": 12,
+        "content": "Getting Started with JDBC: Introducing JDBC, JDBC Components, JDBC Features, JDBC Architecture, Types of JDBC Drivers. Working with JDBC API: Major Classes and Interfaces, Communication with Databases using JDBC APIs. Implementing JDBC Statements and ResultSets: JDBC Statements, Working with Statement, Methods of Statement Class, Working with PreparedStatement Interface, Comparing Statement and PreparedStatement Objects, Describing setters of PreparedStatement, Advantages and Disadvantages of PreparedStatement, Using PreparedStatement, Working with ResultSet Interface, Using ResultSet."
       },
       {
-        id: 'dbms',
-        name: 'Database Management',
-        semesterId: 'sem3',
-        units: [
-          {
-            id: 'dbms-u1',
-            name: 'ER Models',
-            subjectId: 'dbms',
-            topics: [
-              { id: 't25', name: 'Entities & Attributes', isHighYield: true, unitId: 'dbms-u1' },
-              { id: 't26', name: 'ER Diagrams', isHighYield: true, unitId: 'dbms-u1' },
-              { id: 't27', name: 'Relationships', isHighYield: false, unitId: 'dbms-u1' },
-              { id: 't28', name: 'Keys', isHighYield: false, unitId: 'dbms-u1' },
-            ],
-          },
-          {
-            id: 'dbms-u2',
-            name: 'SQL',
-            subjectId: 'dbms',
-            topics: [
-              { id: 't29', name: 'SELECT Queries', isHighYield: true, unitId: 'dbms-u2' },
-              { id: 't30', name: 'Joins', isHighYield: true, unitId: 'dbms-u2' },
-              { id: 't31', name: 'Aggregate Functions', isHighYield: false, unitId: 'dbms-u2' },
-              { id: 't32', name: 'Subqueries', isHighYield: false, unitId: 'dbms-u2' },
-            ],
-          },
-          {
-            id: 'dbms-u3',
-            name: 'Normalization',
-            subjectId: 'dbms',
-            topics: [
-              { id: 't33', name: '1NF, 2NF, 3NF', isHighYield: true, unitId: 'dbms-u3' },
-              { id: 't34', name: 'BCNF', isHighYield: true, unitId: 'dbms-u3' },
-              { id: 't35', name: 'Dependency Preservation', isHighYield: false, unitId: 'dbms-u3' },
-              { id: 't36', name: 'Decomposition', isHighYield: false, unitId: 'dbms-u3' },
-            ],
-          },
-        ],
+        "unit_number": 3,
+        "title": "Java Servlets",
+        "hours": 12,
+        "content": "Introduction to Java Servlets, Benefits of Using a Java Servlet, A Simple Java Servlet, Anatomy of a Java Servlet, Deployment Descriptor, Reading Data from a Client, Reading HTTP Request Headers, Sending Data to a Client and Writing the HTTP Response Header, Working with Cookies, Tracking Sessions."
       },
-    ],
+      {
+        "unit_number": 4,
+        "title": "Java Server Pages (JSP)",
+        "hours": 12,
+        "content": "Introduction to JSP: Understanding JSP, Advantages of JSP over Servlets, the JSP Architecture, JSP Life Cycle, Creating Simple JSP Page. Working with JSP Basic Tags and Implicit Objects: Scripting Tags, Implicit Objects, Directive Tags. Working with JavaBeans and Action Tags: JavaBean, Advantages of Using Beans, Action Tags."
+      }
+    ]
   },
   {
-    id: 'sem4',
-    name: 'Semester 4',
-    subjects: [
+    "semester": 6,
+    "subject_code": "G601DC1.6",
+    "subject_name": "PHP and MySQL",
+    "type": "DSC",
+    "credits": 3,
+    "total_hours": 42,
+    "exam_marks": 60,
+    "cie_marks": 40,
+    "total_marks": 100,
+    "units": [
       {
-        id: 'java',
-        name: 'Java Programming',
-        semesterId: 'sem4',
-        units: [
-          {
-            id: 'java-u1',
-            name: 'OOP Concepts',
-            subjectId: 'java',
-            topics: [
-              { id: 't37', name: 'Classes & Objects', isHighYield: true, unitId: 'java-u1' },
-              { id: 't38', name: 'Inheritance', isHighYield: true, unitId: 'java-u1' },
-              { id: 't39', name: 'Polymorphism', isHighYield: false, unitId: 'java-u1' },
-              { id: 't40', name: 'Encapsulation', isHighYield: false, unitId: 'java-u1' },
-            ],
-          },
-          {
-            id: 'java-u2',
-            name: 'Exception Handling',
-            subjectId: 'java',
-            topics: [
-              { id: 't41', name: 'Try-Catch', isHighYield: true, unitId: 'java-u2' },
-              { id: 't42', name: 'Finally Block', isHighYield: false, unitId: 'java-u2' },
-              { id: 't43', name: 'Custom Exceptions', isHighYield: true, unitId: 'java-u2' },
-              { id: 't44', name: 'Throws Clause', isHighYield: false, unitId: 'java-u2' },
-            ],
-          },
-          {
-            id: 'java-u3',
-            name: 'Multithreading',
-            subjectId: 'java',
-            topics: [
-              { id: 't45', name: 'Thread Lifecycle', isHighYield: true, unitId: 'java-u3' },
-              { id: 't46', name: 'Synchronization', isHighYield: true, unitId: 'java-u3' },
-              { id: 't47', name: 'Inter-thread Communication', isHighYield: false, unitId: 'java-u3' },
-              { id: 't48', name: 'Thread Priority', isHighYield: false, unitId: 'java-u3' },
-            ],
-          },
-        ],
+        "unit_number": 1,
+        "title": "Introduction to PHP",
+        "hours": 10,
+        "content": "Overview of PHP: History and Features of PHP, PHP Installation and Configuration, Basic PHP Syntax, PHP Tags, Comments, Variables, Data Types, Constants. Operators: Arithmetic, Comparison, Logical, String, Assignment Operators. Control Structures: if, if-else, if-elseif-else, switch. Loops: while, do-while, for, foreach. Arrays: Indexed Arrays, Associative Arrays, Multidimensional Arrays, Array Functions."
       },
       {
-        id: 'se',
-        name: 'Software Engineering',
-        semesterId: 'sem4',
-        units: [
-          {
-            id: 'se-u1',
-            name: 'Process Models',
-            subjectId: 'se',
-            topics: [
-              { id: 't49', name: 'Waterfall Model', isHighYield: true, unitId: 'se-u1' },
-              { id: 't50', name: 'Agile Model', isHighYield: true, unitId: 'se-u1' },
-              { id: 't51', name: 'Spiral Model', isHighYield: false, unitId: 'se-u1' },
-              { id: 't52', name: 'RAD Model', isHighYield: false, unitId: 'se-u1' },
-            ],
-          },
-          {
-            id: 'se-u2',
-            name: 'Requirements Engineering',
-            subjectId: 'se',
-            topics: [
-              { id: 't53', name: 'SRS Document', isHighYield: true, unitId: 'se-u2' },
-              { id: 't54', name: 'Functional Requirements', isHighYield: false, unitId: 'se-u2' },
-              { id: 't55', name: 'Non-Functional Requirements', isHighYield: true, unitId: 'se-u2' },
-              { id: 't56', name: 'Requirement Analysis', isHighYield: false, unitId: 'se-u2' },
-            ],
-          },
-          {
-            id: 'se-u3',
-            name: 'Software Testing',
-            subjectId: 'se',
-            topics: [
-              { id: 't57', name: 'White Box Testing', isHighYield: true, unitId: 'se-u3' },
-              { id: 't58', name: 'Black Box Testing', isHighYield: true, unitId: 'se-u3' },
-              { id: 't59', name: 'Unit Testing', isHighYield: false, unitId: 'se-u3' },
-              { id: 't60', name: 'Integration Testing', isHighYield: false, unitId: 'se-u3' },
-            ],
-          },
-        ],
+        "unit_number": 2,
+        "title": "PHP Functions, Forms and File Handling",
+        "hours": 10,
+        "content": "Functions: Defining and Calling Functions, Function Arguments, Return Values, Variable Scope (local, global, static), Built-in String Functions, Math Functions, Date and Time Functions. Forms: HTML Forms with PHP, GET and POST Methods, Form Validation, Sanitizing User Input. File Handling: Opening and Closing Files, Reading and Writing Files, File Upload, Directory Functions. Sessions and Cookies: Creating and Destroying Sessions, Setting and Reading Cookies."
       },
       {
-        id: 'cn',
-        name: 'Computer Networks',
-        semesterId: 'sem4',
-        units: [
-          {
-            id: 'cn-u1',
-            name: 'Network Models',
-            subjectId: 'cn',
-            topics: [
-              { id: 't61', name: 'OSI Model', isHighYield: true, unitId: 'cn-u1' },
-              { id: 't62', name: 'TCP/IP Model', isHighYield: true, unitId: 'cn-u1' },
-              { id: 't63', name: 'Layers Comparison', isHighYield: false, unitId: 'cn-u1' },
-              { id: 't64', name: 'Network Topologies', isHighYield: false, unitId: 'cn-u1' },
-            ],
-          },
-          {
-            id: 'cn-u2',
-            name: 'IP Addressing',
-            subjectId: 'cn',
-            topics: [
-              { id: 't65', name: 'IPv4 vs IPv6', isHighYield: true, unitId: 'cn-u2' },
-              { id: 't66', name: 'Subnetting', isHighYield: true, unitId: 'cn-u2' },
-              { id: 't67', name: 'Classless Inter-Domain Routing', isHighYield: false, unitId: 'cn-u2' },
-              { id: 't68', name: 'Network Masks', isHighYield: false, unitId: 'cn-u2' },
-            ],
-          },
-          {
-            id: 'cn-u3',
-            name: 'Network Protocols',
-            subjectId: 'cn',
-            topics: [
-              { id: 't69', name: 'HTTP/HTTPS', isHighYield: true, unitId: 'cn-u3' },
-              { id: 't70', name: 'DNS', isHighYield: true, unitId: 'cn-u3' },
-              { id: 't71', name: 'DHCP', isHighYield: false, unitId: 'cn-u3' },
-              { id: 't72', name: 'FTP', isHighYield: false, unitId: 'cn-u3' },
-            ],
-          },
-        ],
+        "unit_number": 3,
+        "title": "Object Oriented PHP and MySQL Basics",
+        "hours": 10,
+        "content": "OOP in PHP: Classes and Objects, Constructors and Destructors, Access Modifiers (public, private, protected), Inheritance, Method Overriding, Interfaces, Abstract Classes, Static Methods and Properties. Introduction to MySQL: Database Concepts, MySQL Data Types, Creating and Dropping Databases and Tables, INSERT, SELECT, UPDATE, DELETE Statements, WHERE Clause, ORDER BY, GROUP BY, HAVING, Aggregate Functions (COUNT, SUM, AVG, MIN, MAX)."
       },
-    ],
+      {
+        "unit_number": 4,
+        "title": "PHP and MySQL Integration",
+        "hours": 12,
+        "content": "Connecting PHP to MySQL: Using MySQLi (Procedural and OOP style) and PDO. CRUD Operations: Inserting, Fetching, Updating and Deleting Records through PHP. Prepared Statements: Using Prepared Statements with MySQLi and PDO for Secure Queries. Error Handling in Database Operations. Building a Simple Web Application: Registration and Login System, Displaying Records in Tables, Search and Filter Functionality. Introduction to AJAX with PHP for Dynamic Content."
+      }
+    ]
   },
+  {
+    "semester": 6,
+    "subject_code": "G601DE1.6",
+    "subject_name": "Fundamentals of Data Science",
+    "type": "DSE",
+    "credits": 3,
+    "total_hours": 42,
+    "exam_marks": 60,
+    "cie_marks": 40,
+    "total_marks": 100,
+    "units": [
+      {
+        "unit_number": 1,
+        "title": "Introduction to Data Science",
+        "hours": 10,
+        "content": "What is Data Science: Definition, Importance, Applications of Data Science across domains (Healthcare, Finance, Retail, Social Media). Data Science Lifecycle: Problem Definition, Data Collection, Data Cleaning, Exploratory Analysis, Modeling, Deployment. Types of Data: Structured, Unstructured, Semi-structured. Data Sources: Databases, APIs, Web Scraping, Flat files. Introduction to Python for Data Science: NumPy Arrays, Array Operations, Indexing, Slicing. Introduction to Pandas: Series, DataFrames, Reading CSV and Excel files, Basic DataFrame operations."
+      },
+      {
+        "unit_number": 2,
+        "title": "Data Wrangling and Exploratory Data Analysis",
+        "hours": 10,
+        "content": "Data Wrangling: Handling Missing Values (dropna, fillna), Removing Duplicates, Data Type Conversion, Renaming Columns, Filtering and Selecting Data. Data Transformation: Normalization, Standardization, Encoding Categorical Variables (Label Encoding, One-Hot Encoding). Exploratory Data Analysis (EDA): Descriptive Statistics (mean, median, mode, variance, standard deviation), Distribution Analysis, Correlation, Covariance. Data Visualization: Matplotlib and Seaborn — Bar charts, Histograms, Box plots, Scatter plots, Heatmaps, Pair plots."
+      },
+      {
+        "unit_number": 3,
+        "title": "Introduction to Machine Learning",
+        "hours": 12,
+        "content": "Machine Learning Overview: Types of Machine Learning — Supervised, Unsupervised, Reinforcement Learning. Supervised Learning Algorithms: Linear Regression (Simple and Multiple), Logistic Regression, Decision Trees, K-Nearest Neighbors (KNN). Model Evaluation: Train-Test Split, Cross Validation, Confusion Matrix, Accuracy, Precision, Recall, F1-Score, Mean Squared Error (MSE), R-Squared. Unsupervised Learning: K-Means Clustering, Hierarchical Clustering, Cluster Evaluation. Introduction to scikit-learn: Loading datasets, Preprocessing, Fitting models, Prediction."
+      },
+      {
+        "unit_number": 4,
+        "title": "Data Storage, Big Data and Applications",
+        "hours": 10,
+        "content": "Data Storage: Relational Databases vs NoSQL Databases, Introduction to MongoDB for Data Science, Querying data with SQL and MongoDB. Big Data Concepts: Definition of Big Data, 5Vs (Volume, Velocity, Variety, Veracity, Value), Introduction to Hadoop Ecosystem (HDFS, MapReduce), Introduction to Apache Spark. Real-World Data Science Applications: Recommendation Systems, Sentiment Analysis, Fraud Detection, Image Classification overview. Data Science Ethics: Data Privacy, Bias in Machine Learning, Responsible AI, GDPR basics."
+      }
+    ]
+  }
 ];
+
+const semesterMap = new Map();
+
+rawData.forEach(item => {
+  const semNum = item.semester;
+  if (!semesterMap.has(semNum)) {
+    semesterMap.set(semNum, {
+      id: "sem" + semNum,
+      semesterNumber: semNum,
+      name: "Semester " + semNum,
+      subjects: []
+    });
+  }
+
+  const semester = semesterMap.get(semNum);
+  const subject = {
+    id: item.subject_code,
+    subject_code: item.subject_code,
+    subject_name: item.subject_name,
+    type: item.type,
+    credits: item.credits,
+    total_hours: item.total_hours,
+    exam_marks: item.exam_marks,
+    cie_marks: item.cie_marks,
+    total_marks: item.total_marks,
+    semesterNumber: semNum,
+    units: item.units.map(u => {
+      const unitId = item.subject_code + "-u" + u.unit_number;
+      return {
+        id: unitId,
+        unit_number: u.unit_number,
+        title: u.title,
+        hours: u.hours,
+        content: u.content,
+        subjectId: item.subject_code,
+        topics: parseTopics(u.content, unitId)
+      };
+    })
+  };
+  semester.subjects.push(subject);
+});
+
+export const syllabus = Array.from(semesterMap.values());

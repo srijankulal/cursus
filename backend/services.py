@@ -12,7 +12,14 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from backend.config import Settings
-from backend.schemas import IngestRequest, IngestResponse, QueryHit, QueryRequest, QueryResponse
+from backend.schemas import (
+    IngestRequest,
+    IngestResponse,
+    QueryCleanResponse,
+    QueryHit,
+    QueryRequest,
+    QueryResponse,
+)
 from backend.state import AppState
 
 
@@ -30,6 +37,21 @@ def compute_text_hash(text: str) -> str:
 
 def default_document_id(doc_type: str, source_url: str) -> str:
     return str(uuid.uuid5(uuid.NAMESPACE_URL, f"{doc_type}:{source_url}"))
+
+
+def sanitize_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+    sanitized: dict[str, Any] = {}
+    for key, value in metadata.items():
+        if value is None:
+            continue
+        if isinstance(value, (str, int, float, bool)):
+            sanitized[key] = value
+            continue
+        if isinstance(value, list):
+            sanitized[key] = [str(item) for item in value if item is not None]
+            continue
+        sanitized[key] = json.dumps(value, ensure_ascii=False)
+    return sanitized
 
 
 def parse_json_from_gemini_text(text: str) -> list[dict[str, Any]]:
@@ -191,6 +213,104 @@ def parse_questions_with_gemini(state: AppState, text: str) -> list[dict[str, An
     return parse_json_from_gemini_text(text_output)
 
 
+def generate_clean_notes_answer(
+    state: AppState,
+    question: str,
+    contexts: list[str],
+    style: Literal["brief", "detailed", "bullets"] = "brief",
+) -> str:
+    context_block = "\n\n".join(
+        f"Context {index + 1}:\n{context}" for index, context in enumerate(contexts)
+    )
+    url = (
+        f"https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{state.settings.gemini_model}:generateContent"
+    )
+    style_instructions = {
+        "brief": "Respond in 3-5 concise sentences.",
+        "detailed": "Respond with a well-structured detailed explanation.",
+        "bullets": "Respond as concise bullet points.",
+    }
+    system_prompt = (
+        "You are a study assistant. Answer the user's question only from the provided contexts. "
+        "Write clear English and do not hallucinate details. "
+        f"Formatting requirement: {style_instructions.get(style, style_instructions['brief'])} "
+        "If context is insufficient, say so clearly."
+    )
+    payload = {
+        "system_instruction": {"parts": [{"text": system_prompt}]},
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "text": (
+                            f"Question:\n{question}\n\n"
+                            f"Retrieved Contexts:\n{context_block}"
+                        )
+                    }
+                ]
+            }
+        ],
+        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1024},
+    }
+    response = requests.post(
+        f"{url}?key={state.settings.gemini_api_key}",
+        json=payload,
+        timeout=state.settings.request_timeout_seconds,
+    )
+    response.raise_for_status()
+    data = response.json()
+    candidates = data.get("candidates", [])
+    if not candidates:
+        return "No answer could be generated from retrieved notes."
+    parts = candidates[0].get("content", {}).get("parts", [])
+    if not parts:
+        return "No answer could be generated from retrieved notes."
+    answer = str(parts[0].get("text", "")).strip()
+    return answer or "No answer could be generated from retrieved notes."
+
+
+def generate_fallback_notes_answer(
+    state: AppState,
+    question: str,
+    style: Literal["brief", "detailed", "bullets"] = "brief",
+) -> str:
+    url = (
+        f"https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{state.settings.gemini_model}:generateContent"
+    )
+    style_instructions = {
+        "brief": "Respond in 3-5 concise sentences.",
+        "detailed": "Respond with a well-structured detailed explanation.",
+        "bullets": "Respond as concise bullet points.",
+    }
+    system_prompt = (
+        "You are a study assistant. The retrieval system found no relevant chunks, so answer from general knowledge. "
+        "Be clear and practical for a student. Mention briefly that this is a fallback answer based on general knowledge. "
+        f"Formatting requirement: {style_instructions.get(style, style_instructions['brief'])}"
+    )
+    payload = {
+        "system_instruction": {"parts": [{"text": system_prompt}]},
+        "contents": [{"parts": [{"text": f"Question:\n{question}"}]}],
+        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1024},
+    }
+    response = requests.post(
+        f"{url}?key={state.settings.gemini_api_key}",
+        json=payload,
+        timeout=state.settings.request_timeout_seconds,
+    )
+    response.raise_for_status()
+    data = response.json()
+    candidates = data.get("candidates", [])
+    if not candidates:
+        return "No answer could be generated."
+    parts = candidates[0].get("content", {}).get("parts", [])
+    if not parts:
+        return "No answer could be generated."
+    answer = str(parts[0].get("text", "")).strip()
+    return answer or "No answer could be generated."
+
+
 def build_base_metadata(
     payload: IngestRequest, document_id: str, document_name: str, text_hash: str
 ) -> dict[str, Any]:
@@ -206,7 +326,7 @@ def build_base_metadata(
         "created_at": now_iso(),
     }
     metadata.update(payload.extra_metadata)
-    return metadata
+    return sanitize_metadata(metadata)
 
 
 def get_ingestion_status(state: AppState, document_id: str) -> dict[str, Any]:
@@ -267,6 +387,7 @@ def ingest_document(state: AppState, payload: IngestRequest) -> IngestResponse:
 
         vectors: list[dict[str, Any]] = []
         question_count = 0
+        question_documents: list[dict[str, Any]] = []
 
         if payload.doc_type == "notes":
             texts = [normalize_text(chunk.page_content) for chunk in chunks]
@@ -284,7 +405,7 @@ def ingest_document(state: AppState, payload: IngestRequest) -> IngestResponse:
                     {
                         "id": f"{document_id}:chunk:{idx}",
                         "values": embedding,
-                        "metadata": metadata,
+                        "metadata": sanitize_metadata(metadata),
                     }
                 )
         else:
@@ -317,7 +438,30 @@ def ingest_document(state: AppState, payload: IngestRequest) -> IngestResponse:
                         {
                             "id": f"{document_id}:q:{qid}",
                             "text": question_text,
-                            "metadata": metadata,
+                            "metadata": sanitize_metadata(metadata),
+                        }
+                    )
+                    question_documents.append(
+                        {
+                            "document_id": document_id,
+                            "document_name": document_name,
+                            "doc_type": payload.doc_type,
+                            "source_url": str(payload.source_url),
+                            "chunk_index": idx,
+                            "chunk_id": f"{document_id}:chunk:{idx}",
+                            "question_id": f"{document_id}:q:{qid}",
+                            "question_number": str(question.get("question_number") or qid),
+                            "question_text": question_text,
+                            "question_type": question.get("question_type", "unknown"),
+                            "marks": question.get("marks"),
+                            "section": question.get("section"),
+                            "difficulty_hint": question.get("difficulty_hint"),
+                            "subject": payload.subject,
+                            "course": payload.course,
+                            "tags": payload.tags,
+                            "text_hash": text_hash,
+                            "parse_status": "parsed",
+                            "created_at": now_iso(),
                         }
                     )
 
@@ -339,7 +483,7 @@ def ingest_document(state: AppState, payload: IngestRequest) -> IngestResponse:
                         {
                             "id": f"{document_id}:chunk:{idx}",
                             "values": embedding,
-                            "metadata": metadata,
+                            "metadata": sanitize_metadata(metadata),
                         }
                     )
 
@@ -357,6 +501,11 @@ def ingest_document(state: AppState, payload: IngestRequest) -> IngestResponse:
             )
         except Exception:
             pass
+
+        if payload.doc_type == "qpaper":
+            state.mongo_questions_collection.delete_many({"document_id": document_id})
+            if question_documents:
+                state.mongo_questions_collection.insert_many(question_documents)
 
         upsert_vectors(state, namespace, vectors)
 
@@ -445,3 +594,105 @@ def query_vectors(state: AppState, payload: QueryRequest) -> QueryResponse:
 
     all_hits.sort(key=lambda hit: hit.score, reverse=True)
     return QueryResponse(matches=all_hits[: payload.top_k], used_namespaces=namespaces)
+
+
+def query_clean(state: AppState, payload: QueryRequest) -> QueryCleanResponse:
+    query_result = query_vectors(state, payload)
+    mode = payload.doc_type or "notes"
+
+    if mode == "qpaper":
+        if not query_result.matches:
+            return QueryCleanResponse(answer="No matching question found.")
+
+        top_match = query_result.matches[0]
+        question_id = top_match.metadata.get("question_id")
+        if not question_id:
+            return QueryCleanResponse(answer="No matching question found.")
+
+        question_doc = state.mongo_questions_collection.find_one(
+            {"question_id": question_id},
+            {"_id": 0, "question_text": 1},
+        )
+        if not question_doc or not question_doc.get("question_text"):
+            return QueryCleanResponse(answer="No full question text found for this match.")
+
+        return QueryCleanResponse(answer=str(question_doc["question_text"]))
+
+    if not query_result.matches:
+        return QueryCleanResponse(
+            answer=generate_fallback_notes_answer(state, payload.query, payload.style),
+            used_gemini_fallback=True,
+        )
+
+    contexts: list[str] = []
+    seen_chunk_ids: set[str] = set()
+    notes_namespace = state.settings.pinecone_notes_namespace
+
+    for match in query_result.matches[: payload.top_k]:
+        if float(match.score) < state.settings.clean_query_min_score:
+            continue
+
+        match_document_id = str(match.metadata.get("document_id") or "").strip()
+        chunk_index_raw = match.metadata.get("chunk_index")
+        try:
+            chunk_index = int(chunk_index_raw)
+        except (TypeError, ValueError):
+            chunk_index = None
+
+        candidate_chunks: list[tuple[str, str]] = []
+        direct_chunk_id = str(match.metadata.get("chunk_id") or "").strip()
+        if direct_chunk_id:
+            candidate_chunks.append((direct_chunk_id, notes_namespace))
+
+        if match_document_id and chunk_index is not None:
+            prev_idx = chunk_index - 1
+            next_idx = chunk_index + 1
+            if prev_idx >= 0:
+                candidate_chunks.append((f"{match_document_id}:chunk:{prev_idx}", notes_namespace))
+            candidate_chunks.append((f"{match_document_id}:chunk:{next_idx}", notes_namespace))
+
+        for chunk_id, namespace in candidate_chunks:
+            if chunk_id in seen_chunk_ids:
+                continue
+
+            chunk_text = ""
+            try:
+                fetch_result = state.pinecone_index.fetch(ids=[chunk_id], namespace=namespace)
+                vectors = getattr(fetch_result, "vectors", {}) or {}
+                vector_item = vectors.get(chunk_id) if isinstance(vectors, dict) else None
+                if vector_item:
+                    vector_metadata = getattr(vector_item, "metadata", None)
+                    if vector_metadata is None and isinstance(vector_item, dict):
+                        vector_metadata = vector_item.get("metadata", {})
+                    vector_metadata = dict(vector_metadata or {})
+                    chunk_text = str(
+                        vector_metadata.get("chunk_text_preview")
+                        or vector_metadata.get("question_text_preview")
+                        or ""
+                    ).strip()
+            except Exception:
+                chunk_text = ""
+
+            if not chunk_text and chunk_id == direct_chunk_id:
+                chunk_text = str(
+                    match.metadata.get("chunk_text_preview")
+                    or match.metadata.get("question_text_preview")
+                    or match.text_preview
+                    or ""
+                ).strip()
+
+            if chunk_text:
+                contexts.append(chunk_text)
+                seen_chunk_ids.add(chunk_id)
+
+    if not contexts:
+        answer = generate_fallback_notes_answer(state, payload.query, payload.style)
+        used_fallback = True
+    else:
+        answer = generate_clean_notes_answer(state, payload.query, contexts, payload.style)
+        used_fallback = False
+
+    return QueryCleanResponse(
+        answer=answer,
+        used_gemini_fallback=used_fallback,
+    )

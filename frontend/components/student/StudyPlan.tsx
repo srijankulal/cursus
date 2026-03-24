@@ -3,29 +3,35 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { generateStudyPlan, StudyPlanItem } from '@/lib/gemini';
-import { syllabus } from '@/data/syllabus';
+import { useSyllabus } from '@/lib/hooks/use-syllabus';
 import { storage } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sparkles, Calendar, Target, TrendingUp, PartyPopper, Clock, CheckCircle2, FlaskConical } from 'lucide-react';
 
 export const StudyPlan = () => {
-  const [loading, setLoading] = useState(false);
+  const [genLoading, setGenLoading] = useState(false);
   const [pace, setPace] = useState('moderate');
   const [plan, setPlan] = useState<StudyPlanItem[]>([]);
+  const { semester: sem, loading, error } = useSyllabus(6);
 
   const generate = async () => {
-    setLoading(true);
+    if (!sem) return;
+    setGenLoading(true);
     const completed = storage.getCompletedTopics();
-    const todo = syllabus[0].subjects.flatMap(s => 
+    const todo = sem.subjects.flatMap(s => 
       s.units.flatMap(u => 
         u.topics.filter(t => !completed.includes(t.id)).map(t => ({ ...t, subject: s.name }))
       )
     );
     const result = await generateStudyPlan(todo, pace);
     setPlan(result);
-    setLoading(false);
+    setGenLoading(false);
   };
+
+  if (loading) return <div className="p-10 text-center animate-pulse text-app-muted uppercase tracking-[0.2em] font-bold">Initializing Plan Generator...</div>;
+  if (error || !sem) return <div className="p-10 text-center text-rose-500 font-bold uppercase tracking-[0.2em]">Error loading generator</div>;
+
 
   return (
     <div className="space-y-10 pb-16">
@@ -62,10 +68,10 @@ export const StudyPlan = () => {
           
           <Button
             onClick={generate}
-            disabled={loading}
+            disabled={genLoading}
             className="w-full sm:w-auto h-11 px-8 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm shadow-md transition-all active:scale-95 flex items-center gap-3 mt-5 sm:mt-0"
           >
-            {loading ? (
+            {genLoading ? (
               <>
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 <span>BUILDING...</span>
@@ -136,7 +142,7 @@ export const StudyPlan = () => {
               <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest opacity-80">STAY CONSISTENT, STAY AHEAD</p>
             </div>
           </motion.div>
-        ) : !loading && (
+        ) : !genLoading && (
           <div className="py-20 flex flex-col items-center justify-center text-center opacity-30 select-none pointer-events-none">
             <Calendar size={64} strokeWidth={1} className="mb-4" />
             <p className="text-sm font-bold max-w-xs">Enter your exam date in Settings to see exact day counts.</p>
