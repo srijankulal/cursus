@@ -1,6 +1,15 @@
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextResponse } from 'next/server';
-
 import { getDb } from '@/lib/mongodb';
+
+// ─── Gemini client setup ──────────────────────────────────────────────────────
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const model = genAI.getGenerativeModel({
+  model: 'gemini-3-flash-preview',
+});
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type PlannedTopic = {
   subject: string;
@@ -47,71 +56,78 @@ type GeminiPlannerResponse = {
   }>;
 };
 
-const WEEKS_IN_FOUR_MONTHS = 16;
-const CORE_WEEKS = 12;
-const GEMINI_API_KEY =
-  process.env.GEMINI_API_KEY ||
-  process.env.Gemini_KEY ||
-  process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
-  '';
-const GEMINI_ENDPOINT =
-  `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
-const GEMINI_TIMEOUT_MS = 20000;
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const MIN_DURATION_MONTHS = 3;
+const MAX_DURATION_MONTHS = 4;
+const WEEKS_PER_MONTH = 4;
+const REVISION_WEEKS = 4;
 const PROMPT_TOPICS_LIMIT = 180;
+const CACHE_TTL_MS = 1000 * 60 * 30; // 30 minutes
+
+// ─── In-memory cache ──────────────────────────────────────────────────────────
+
+const planCache = new Map<string, { plan: StudyPlanWeek[]; cachedAt: number }>();
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function normalizeTopic(rawTopic: unknown) {
   if (typeof rawTopic === 'string') {
     return { topic: rawTopic, isHighYield: false };
   }
-
   if (rawTopic && typeof rawTopic === 'object') {
-    const topicObj = rawTopic as { name?: string; title?: string; topic?: string; isHighYield?: boolean };
+    const t = rawTopic as {
+      name?: string;
+      title?: string;
+      topic?: string;
+      isHighYield?: boolean;
+    };
     return {
-      topic: topicObj.name || topicObj.title || topicObj.topic || 'Untitled Topic',
-      isHighYield: Boolean(topicObj.isHighYield),
+      topic: t.name || t.title || t.topic || 'Untitled Topic',
+      isHighYield: Boolean(t.isHighYield),
     };
   }
-
-  return {
-    topic: 'Untitled Topic',
-    isHighYield: false,
-  };
+  return { topic: 'Untitled Topic', isHighYield: false };
 }
 
 function extractPlannedTopics(semesterDocuments: SyllabusDocument[]) {
   const plannedTopics: PlannedTopic[] = [];
 
-  const pushFromUnits = (subjectName: string, unitsRaw: unknown) => {
-    if (!Array.isArray(unitsRaw)) return;
+  for (const doc of semesterDocuments) {
+    const subjectName =
+      (typeof doc.subject_name === 'string' && doc.subject_name.trim()) ||
+      (typeof doc.name === 'string' && doc.name.trim()) ||
+      (typeof doc.title === 'string' && doc.title.trim()) ||
+      'Unnamed Subject';
 
-    for (const unitRaw of unitsRaw) {
+    if (!Array.isArray(doc.units)) continue;
+
+    for (const unitRaw of doc.units) {
       if (!unitRaw || typeof unitRaw !== 'object') continue;
-      const unitObj = unitRaw as { unit_number?: number; name?: string; title?: string; topics?: unknown[] };
+      const unitObj = unitRaw as {
+        unit_number?: number;
+        name?: string;
+        title?: string;
+        topics?: unknown[];
+      };
       const unitName =
         unitObj.name ||
         unitObj.title ||
-        (Number.isFinite(unitObj.unit_number) ? `Unit ${unitObj.unit_number}` : 'Unnamed Unit');
-      const topicsRaw = Array.isArray(unitObj.topics) ? unitObj.topics : [];
+        (Number.isFinite(unitObj.unit_number)
+          ? `Unit ${unitObj.unit_number}`
+          : 'Unnamed Unit');
 
+      const topicsRaw = Array.isArray(unitObj.topics) ? unitObj.topics : [];
       for (const topicRaw of topicsRaw) {
-        const normalizedTopic = normalizeTopic(topicRaw);
+        const normalized = normalizeTopic(topicRaw);
         plannedTopics.push({
           subject: subjectName,
           unit: unitName,
-          topic: normalizedTopic.topic,
-          isHighYield: normalizedTopic.isHighYield,
+          topic: normalized.topic,
+          isHighYield: normalized.isHighYield,
         });
       }
     }
-  };
-
-  for (const semesterDoc of semesterDocuments) {
-    const subjectName =
-      (typeof semesterDoc.subject_name === 'string' && semesterDoc.subject_name.trim()) ||
-      (typeof semesterDoc.name === 'string' && semesterDoc.name.trim()) ||
-      (typeof semesterDoc.title === 'string' && semesterDoc.title.trim()) ||
-      'Unnamed Subject';
-    pushFromUnits(subjectName, semesterDoc.units);
   }
 
   return plannedTopics;
@@ -127,7 +143,6 @@ function stripJsonFence(text: string) {
 
 function parseGeminiPlannerJson(text: string): GeminiPlannerResponse | null {
   const cleaned = stripJsonFence(text);
-
   try {
     return JSON.parse(cleaned) as GeminiPlannerResponse;
   } catch {
@@ -145,45 +160,57 @@ function formatDate(date: Date) {
   return date.toISOString().split('T')[0];
 }
 
-function buildDeterministicFourMonthPlan(sortedTopics: PlannedTopic[]): StudyPlanWeek[] {
+// ─── Deterministic fallback plan ──────────────────────────────────────────────
+
+function buildDeterministicPlan(
+  sortedTopics: PlannedTopic[],
+  durationMonths: number
+): StudyPlanWeek[] {
+  const totalWeeks = durationMonths * WEEKS_PER_MONTH;
+  const coreWeeks = Math.max(1, totalWeeks - REVISION_WEEKS);
+
   const now = new Date();
   now.setHours(0, 0, 0, 0);
 
+  const topicsPerCoreWeek = Math.max(
+    1,
+    Math.ceil(sortedTopics.length / coreWeeks)
+  );
+  const highYieldTopics = sortedTopics.filter((t) => t.isHighYield);
   const plan: StudyPlanWeek[] = [];
-  const topicsPerCoreWeek = Math.max(1, Math.ceil(sortedTopics.length / CORE_WEEKS));
-  const highYieldTopics = sortedTopics.filter((topic) => topic.isHighYield);
 
-  for (let weekIndex = 0; weekIndex < WEEKS_IN_FOUR_MONTHS; weekIndex++) {
-    const weekNumber = weekIndex + 1;
-    const monthNumber = Math.floor(weekIndex / 4) + 1;
+  for (let weekIndex = 0; weekIndex < totalWeeks; weekIndex++) {
     const startDate = new Date(now);
     startDate.setDate(now.getDate() + weekIndex * 7);
-
     const endDate = new Date(startDate);
     endDate.setDate(startDate.getDate() + 6);
 
     let weekTopics: PlannedTopic[] = [];
     let focus = 'Core syllabus coverage';
 
-    if (weekIndex < CORE_WEEKS) {
+    if (weekIndex < coreWeeks) {
       const start = weekIndex * topicsPerCoreWeek;
-      const end = start + topicsPerCoreWeek;
-      weekTopics = sortedTopics.slice(start, end);
-
-      if (weekTopics.some((topic) => topic.isHighYield)) {
+      weekTopics = sortedTopics.slice(start, start + topicsPerCoreWeek);
+      if (weekTopics.some((t) => t.isHighYield)) {
         focus = 'Core topics + high-yield emphasis';
       }
     } else {
-      const revisionWindowSize = Math.max(1, Math.ceil(highYieldTopics.length / (WEEKS_IN_FOUR_MONTHS - CORE_WEEKS)));
-      const revisionIndex = weekIndex - CORE_WEEKS;
-      const revisionStart = revisionIndex * revisionWindowSize;
-      weekTopics = highYieldTopics.slice(revisionStart, revisionStart + revisionWindowSize);
+      const revisionWeeksCount = Math.max(1, totalWeeks - coreWeeks);
+      const windowSize = Math.max(
+        1,
+        Math.ceil(highYieldTopics.length / revisionWeeksCount)
+      );
+      const revisionIndex = weekIndex - coreWeeks;
+      weekTopics = highYieldTopics.slice(
+        revisionIndex * windowSize,
+        revisionIndex * windowSize + windowSize
+      );
       focus = 'Revision + practice questions';
     }
 
     plan.push({
-      month: monthNumber,
-      week: weekNumber,
+      month: Math.floor(weekIndex / WEEKS_PER_MONTH) + 1,
+      week: weekIndex + 1,
       startDate: formatDate(startDate),
       endDate: formatDate(endDate),
       focus,
@@ -194,55 +221,72 @@ function buildDeterministicFourMonthPlan(sortedTopics: PlannedTopic[]): StudyPla
   return plan;
 }
 
+// ─── Normalize Gemini output ──────────────────────────────────────────────────
+
 function normalizeGeminiPlan(
   geminiPlan: GeminiPlannerResponse['plan'],
-  topicsFallback: PlannedTopic[]
+  topicsFallback: PlannedTopic[],
+  durationMonths: number
 ): StudyPlanWeek[] | null {
+  const totalWeeks = durationMonths * WEEKS_PER_MONTH;
   if (!Array.isArray(geminiPlan) || geminiPlan.length === 0) return null;
 
   const now = new Date();
   now.setHours(0, 0, 0, 0);
 
-  const normalized: StudyPlanWeek[] = geminiPlan.slice(0, WEEKS_IN_FOUR_MONTHS).map((weekData, index) => {
-    const weekNumber = index + 1;
-    const monthNumber = Math.floor(index / 4) + 1;
-    const startDate = new Date(now);
-    startDate.setDate(now.getDate() + index * 7);
-    const endDate = new Date(startDate);
-    endDate.setDate(startDate.getDate() + 6);
+  const normalized: StudyPlanWeek[] = geminiPlan
+    .slice(0, totalWeeks)
+    .map((weekData, index) => {
+      const startDate = new Date(now);
+      startDate.setDate(now.getDate() + index * 7);
+      const endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6);
 
-    const topics = Array.isArray(weekData.topics)
-      ? weekData.topics
-          .map((topic) => ({
-            subject: cleanText(topic.subject) || 'General',
-            unit: cleanText(topic.unit) || 'Unit',
-            topic: cleanText(topic.topic) || 'Topic',
-            isHighYield: Boolean(topic.isHighYield),
-          }))
-          .filter((topic) => topic.topic !== 'Topic')
-      : [];
+      const monthNumber = Math.floor(index / WEEKS_PER_MONTH) + 1;
+      const weekNumber = index + 1;
 
-    return {
-      month: Number.isInteger(weekData.month) && weekData.month! >= 1 && weekData.month! <= 4 ? weekData.month! : monthNumber,
-      week: Number.isInteger(weekData.week) && weekData.week! >= 1 && weekData.week! <= WEEKS_IN_FOUR_MONTHS ? weekData.week! : weekNumber,
-      startDate: formatDate(startDate),
-      endDate: formatDate(endDate),
-      focus: cleanText(weekData.focus) || 'Syllabus coverage and revision',
-      topics,
-    };
-  });
+      const topics = Array.isArray(weekData.topics)
+        ? weekData.topics
+            .map((t) => ({
+              subject: cleanText(t.subject) || 'General',
+              unit: cleanText(t.unit) || 'Unit',
+              topic: cleanText(t.topic) || 'Topic',
+              isHighYield: Boolean(t.isHighYield),
+            }))
+            .filter((t) => t.topic !== 'Topic')
+        : [];
 
-  while (normalized.length < WEEKS_IN_FOUR_MONTHS) {
+      return {
+        month:
+          Number.isInteger(weekData.month) &&
+          weekData.month! >= 1 &&
+          weekData.month! <= durationMonths
+            ? weekData.month!
+            : monthNumber,
+        week:
+          Number.isInteger(weekData.week) &&
+          weekData.week! >= 1 &&
+          weekData.week! <= totalWeeks
+            ? weekData.week!
+            : weekNumber,
+        startDate: formatDate(startDate),
+        endDate: formatDate(endDate),
+        focus: cleanText(weekData.focus) || 'Syllabus coverage and revision',
+        topics,
+      };
+    });
+
+  // Pad any missing weeks
+  while (normalized.length < totalWeeks) {
     const weekIndex = normalized.length;
-    const weekNumber = weekIndex + 1;
-    const monthNumber = Math.floor(weekIndex / 4) + 1;
     const startDate = new Date(now);
     startDate.setDate(now.getDate() + weekIndex * 7);
     const endDate = new Date(startDate);
     endDate.setDate(startDate.getDate() + 6);
+
     normalized.push({
-      month: monthNumber,
-      week: weekNumber,
+      month: Math.floor(weekIndex / WEEKS_PER_MONTH) + 1,
+      week: weekIndex + 1,
       startDate: formatDate(startDate),
       endDate: formatDate(endDate),
       focus: 'Revision + practice questions',
@@ -250,102 +294,135 @@ function normalizeGeminiPlan(
     });
   }
 
-  const topicCount = normalized.reduce((sum, week) => sum + week.topics.length, 0);
-  if (topicCount === 0) return buildDeterministicFourMonthPlan(topicsFallback);
+  const topicCount = normalized.reduce(
+    (sum, week) => sum + week.topics.length,
+    0
+  );
+  if (topicCount === 0) return buildDeterministicPlan(topicsFallback, durationMonths);
 
   return normalized;
 }
 
-async function callGeminiForPlanner(semester: number, plannedTopics: PlannedTopic[]) {
-  if (!GEMINI_API_KEY) {
-    return null;
-  }
+// ─── Gemini call via SDK ──────────────────────────────────────────────────────
 
-  const topicsForPrompt = plannedTopics.slice(0, PROMPT_TOPICS_LIMIT).map((topic) => ({
-    subject: topic.subject,
-    unit: topic.unit,
-    topic: topic.topic,
-  }));
+async function callGeminiForPlanner(
+  semester: number,
+  plannedTopics: PlannedTopic[],
+  durationMonths: number
+): Promise<GeminiPlannerResponse | null> {
+  const topicsForPrompt = plannedTopics
+    .slice(0, PROMPT_TOPICS_LIMIT)
+    .map(({ subject, unit, topic }) => ({ subject, unit, topic }));
 
-  const systemInstruction =
-    'You are an academic study planner. Return ONLY strict JSON with no markdown and no extra keys.';
+  const totalWeeks = durationMonths * WEEKS_PER_MONTH;
+  const revisionWeeks = Math.min(REVISION_WEEKS, totalWeeks);
 
-  const userPrompt = `Create a 4-month study plan for semester ${semester}.\n\nRules:\n- Plan must be exactly 16 weeks (4 weeks per month).\n- Cover the listed topics with balanced weekly load.\n- Last 4 weeks should have more revision and test practice.\n- Output JSON object with this shape exactly:\n{\n  "plan": [\n    {\n      "month": 1,\n      "week": 1,\n      "focus": "...",\n      "topics": [\n        { "subject": "...", "unit": "...", "topic": "...", "isHighYield": false }\n      ]\n    }\n  ]\n}\n- month must be 1..4 and week must be 1..16.\n- Keep topic text exactly as provided.\n\nTotal topics available: ${plannedTopics.length}.\nTopics provided to model (trimmed if needed): ${topicsForPrompt.length}.\n\nSyllabus topics:\n${JSON.stringify(topicsForPrompt)}`;
+  const prompt = `You are an academic study planner. Return ONLY strict JSON with no markdown and no extra keys.
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+Create a ${durationMonths}-month study plan for BCA semester ${semester}.
 
-  let response: Response;
-  try {
-    response = await fetch(GEMINI_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        system_instruction: {
-          parts: [{ text: systemInstruction }],
-        },
-        contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 3000,
-          responseMimeType: 'application/json',
-        },
-      }),
-      signal: controller.signal,
-    });
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error(`Gemini API timed out after ${GEMINI_TIMEOUT_MS}ms`);
+Rules:
+- Plan must be exactly ${totalWeeks} weeks (${WEEKS_PER_MONTH} weeks per month).
+- Cover all listed topics with a balanced weekly load.
+- Last ${revisionWeeks} weeks must focus on revision and test practice.
+- Output a JSON object with this exact shape:
+{
+  "plan": [
+    {
+      "month": 1,
+      "week": 1,
+      "focus": "...",
+      "topics": [
+        { "subject": "...", "unit": "...", "topic": "...", "isHighYield": false }
+      ]
     }
-    throw error;
-  } finally {
-    clearTimeout(timeout);
-  }
+  ]
+}
+- month must be 1..${durationMonths}, week must be 1..${totalWeeks}.
+- Keep topic text exactly as provided. Do not paraphrase or shorten topic names.
 
-  if (!response.ok) {
-    throw new Error(`Gemini API failed with status ${response.status}`);
-  }
+Total topics available: ${plannedTopics.length}.
+Topics sent to model: ${topicsForPrompt.length}.
 
-  const payload = (await response.json()) as {
-    candidates?: Array<{
-      content?: {
-        parts?: Array<{ text?: string }>;
-      };
-    }>;
-  };
+Syllabus topics:
+${JSON.stringify(topicsForPrompt)}`;
 
-  const text = payload?.candidates?.[0]?.content?.parts?.[0]?.text;
+  // SDK call — same pattern as the reference implementation
+  const result = await model.generateContent(prompt);
+  const text = result.response.text();
+
   if (!text) return null;
-
   return parseGeminiPlannerJson(text);
 }
+
+// ─── Retry wrapper for 429 / RESOURCE_EXHAUSTED (free tier) ──────────────────
+
+async function callGeminiWithRetry(
+  semester: number,
+  plannedTopics: PlannedTopic[],
+  durationMonths: number,
+  retries = 2
+): Promise<GeminiPlannerResponse | null> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await callGeminiForPlanner(semester, plannedTopics, durationMonths);
+    } catch (error) {
+      const is429 =
+        error instanceof Error &&
+        (error.message.includes('429') ||
+          error.message.includes('RESOURCE_EXHAUSTED'));
+
+      if (is429 && attempt < retries) {
+        const waitMs = Math.pow(2, attempt) * 1500; // 1.5s → 3s
+        console.warn(
+          `[AI Planner] Rate limit hit. Retrying in ${waitMs}ms (attempt ${attempt + 1}/${retries})...`
+        );
+        await new Promise((res) => setTimeout(res, waitMs));
+        continue;
+      }
+
+      throw error;
+    }
+  }
+  return null;
+}
+
+// ─── DB fetch ─────────────────────────────────────────────────────────────────
 
 async function fetchSemesterDocuments(semester: number) {
   const db = await getDb();
   const semesterAsString = String(semester);
 
-  const filter = {
-    $or: [
-      { semester },
-      { semester: semesterAsString },
-      { semester: { $regex: `^\\s*${semesterAsString}\\s*$`, $options: 'i' } },
-    ],
-  };
+  const docs = (await db
+    .collection('syllabus')
+    .find({
+      $or: [
+        { semester },
+        { semester: semesterAsString },
+        {
+          semester: {
+            $regex: `^\\s*${semesterAsString}\\s*$`,
+            $options: 'i',
+          },
+        },
+      ],
+    })
+    .toArray()) as unknown as SyllabusDocument[];
 
-  const docs = (await db.collection('syllabus').find(filter).toArray()) as unknown as SyllabusDocument[];
   return docs;
 }
 
-export async function GET(request: Request) {
-  const requestStartedAt = Date.now();
-  try {
-    const { searchParams } = new URL(request.url);
-    const semesterParam = searchParams.get('semester');
-    const semester = Number(semesterParam);
+// ─── Route handler ────────────────────────────────────────────────────────────
 
-    console.info('[AI Planner API] Request received', { semesterParam, semester });
+export async function POST(req: Request): Promise<Response> {
+  const requestStartedAt = Date.now();
+
+  try {
+    const data = await req.json();
+    const semester = Number(data.semester);
+    const durationMonths = Number(data.durationMonths ?? MIN_DURATION_MONTHS);
+
+    console.info('[AI Planner API] Request received', { semester, durationMonths });
 
     if (!Number.isInteger(semester) || semester < 1 || semester > 8) {
       return NextResponse.json(
@@ -354,6 +431,35 @@ export async function GET(request: Request) {
       );
     }
 
+    if (
+      !Number.isInteger(durationMonths) ||
+      durationMonths < MIN_DURATION_MONTHS ||
+      durationMonths > MAX_DURATION_MONTHS
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: `durationMonths must be between ${MIN_DURATION_MONTHS} and ${MAX_DURATION_MONTHS}.`,
+        },
+        { status: 400 }
+      );
+    }
+
+    // ── Cache check ───────────────────────────────────────────────────────────
+    const cacheKey = `sem-${semester}-dur-${durationMonths}`;
+    const cached = planCache.get(cacheKey);
+    if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
+      console.info('[AI Planner API] Serving from cache', { cacheKey });
+      return NextResponse.json({
+        ok: true,
+        semester,
+        durationMonths,
+        source: 'cache',
+        plan: cached.plan,
+      });
+    }
+
+    // ── Fetch syllabus ────────────────────────────────────────────────────────
     const semesterDocuments = await fetchSemesterDocuments(semester);
     console.info('[AI Planner API] Syllabus documents fetched', {
       semester,
@@ -362,10 +468,7 @@ export async function GET(request: Request) {
 
     if (semesterDocuments.length === 0) {
       return NextResponse.json(
-        {
-          ok: false,
-          message: `No syllabus entries found in MongoDB for semester ${semester}.`,
-        },
+        { ok: false, message: `No syllabus entries found for semester ${semester}.` },
         { status: 404 }
       );
     }
@@ -380,23 +483,38 @@ export async function GET(request: Request) {
       return NextResponse.json(
         {
           ok: false,
-          message: `Syllabus found for semester ${semester}, but no topics were available to plan.`,
+          message: `Syllabus found for semester ${semester}, but no topics could be extracted.`,
         },
         { status: 404 }
       );
     }
 
-    const sortedTopics = [...plannedTopics].sort((left, right) => Number(right.isHighYield) - Number(left.isHighYield));
+    const sortedTopics = [...plannedTopics].sort(
+      (a, b) => Number(b.isHighYield) - Number(a.isHighYield)
+    );
 
+    // ── Generate plan ─────────────────────────────────────────────────────────
     let plan: StudyPlanWeek[];
-    let source: 'gemini' | 'fallback' = 'gemini';
+    let source: 'gemini' | 'fallback' | 'cache' = 'gemini';
+
     try {
-      const geminiJson = await callGeminiForPlanner(semester, sortedTopics);
-      const normalizedPlan = normalizeGeminiPlan(geminiJson?.plan, sortedTopics);
+      const geminiJson = await callGeminiWithRetry(
+        semester,
+        sortedTopics,
+        durationMonths
+      );
+      const normalizedPlan = normalizeGeminiPlan(
+        geminiJson?.plan,
+        sortedTopics,
+        durationMonths
+      );
+
       if (!normalizedPlan) {
         source = 'fallback';
-        plan = buildDeterministicFourMonthPlan(sortedTopics);
-        console.warn('[AI Planner API] Gemini output invalid, using fallback', { semester });
+        plan = buildDeterministicPlan(sortedTopics, durationMonths);
+        console.warn('[AI Planner API] Gemini output invalid, using deterministic fallback', {
+          semester,
+        });
       } else {
         plan = normalizedPlan;
         console.info('[AI Planner API] Gemini plan accepted', {
@@ -405,14 +523,17 @@ export async function GET(request: Request) {
         });
       }
     } catch (error) {
-      console.error('Gemini planner failed. Falling back to deterministic plan:', error);
+      console.error('[AI Planner API] Gemini failed, falling back:', error);
       source = 'fallback';
-      plan = buildDeterministicFourMonthPlan(sortedTopics);
+      plan = buildDeterministicPlan(sortedTopics, durationMonths);
     }
 
+    // ── Store in cache ────────────────────────────────────────────────────────
+    planCache.set(cacheKey, { plan, cachedAt: Date.now() });
+
     const highYieldTopicsCount = plan
-      .flatMap((week) => week.topics)
-      .filter((topic) => topic.isHighYield).length;
+      .flatMap((w) => w.topics)
+      .filter((t) => t.isHighYield).length;
 
     console.info('[AI Planner API] Request completed', {
       semester,
@@ -424,18 +545,15 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ok: true,
       semester,
-      durationMonths: 4,
-      subjects: Array.from(new Set(sortedTopics.map((topic) => topic.subject))),
+      durationMonths,
+      subjects: Array.from(new Set(sortedTopics.map((t) => t.subject))),
       totalTopics: sortedTopics.length,
       highYieldTopics: highYieldTopicsCount,
       source,
       plan,
     });
   } catch (error) {
-    console.error('AI planner generation failed:', error);
-    console.error('[AI Planner API] Request failed', {
-      durationMs: Date.now() - requestStartedAt,
-    });
+    console.error('[AI Planner API] Unhandled error:', error);
     return NextResponse.json(
       { ok: false, message: 'Failed to generate AI planner.' },
       { status: 500 }
