@@ -27,6 +27,7 @@ Important optional keys:
 - `MONGODB_DOCUMENTS_COLLECTION` (default: `rag_documents`)
 - `MONGODB_QUESTIONS_COLLECTION` (default: `rag_qpaper_questions`)
 - `PINECONE_EMBEDDING_MODEL` (default: `llama-text-embed-v2`)
+- `GEMINI_MODEL` (default: `gemini-3-flash-preview`)
 - `PINECONE_NOTES_NAMESPACE` / `PINECONE_QPAPER_NAMESPACE`
 - `CLEAN_QUERY_MIN_SCORE` (default: `0.2`)
 

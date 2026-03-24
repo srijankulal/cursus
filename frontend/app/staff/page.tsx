@@ -27,6 +27,8 @@ interface StaffClass {
   canManageStudents: boolean;
   assignedSubjects: Array<{ subjectId: string; subjectName: string }>;
   students: Array<{ _id: string; rollNumber: string; semester: number }>;
+  assignedSubjects: Array<{ subjectId: string; subjectName: string }>;
+  students: Array<{ _id: string; rollNumber: string; semester: number }>;
 }
 
 interface StudentCandidate {
@@ -35,23 +37,68 @@ interface StudentCandidate {
   name: string;
   assignedClassId: string | null;
   inSelectedClass: boolean;
+   semester: number; 
 }
 
 export default function StaffPage() {
-  const [tab,                    setTab]                    = useState('dashboard');
-  const [classes,                setClasses]                = useState<StaffClass[]>([]);
-  const [loading,                setLoading]                = useState(true);
-  const [feedback,               setFeedback]               = useState<string | null>(null);
-  const [feedbackType,           setFeedbackType]           = useState<'success' | 'error' | null>(null);
-  const [selectedClassId,        setSelectedClassId]        = useState<string>('');
-  const [newRollNumber,          setNewRollNumber]          = useState('');
-  const [selectedCandidateRoll,  setSelectedCandidateRoll]  = useState('');
-  const [candidateStudents,      setCandidateStudents]      = useState<StudentCandidate[]>([]);
-  const [isSubmitting,           setIsSubmitting]           = useState(false);
-  const [isMobileMenuOpen,       setIsMobileMenuOpen]       = useState(false);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [classes, setClasses] = useState<StaffClass[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [selectedClassId, setSelectedClassId] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
 
-  const manageableClasses = useMemo(() => classes.filter((c) => c.canManageStudents), [classes]);
-  const selectedClass     = useMemo(() => manageableClasses.find((c) => c._id === selectedClassId) ?? null, [manageableClasses, selectedClassId]);
+  // Create class state
+  const [createForm, setCreateForm] = useState({ name: '', semester: '', capacity: '' });
+  const [isCreating, setIsCreating] = useState(false);
+
+  // Student management state
+  const [newRollNumber, setNewRollNumber] = useState('');
+  const [candidateStudents, setCandidateStudents] = useState<StudentCandidate[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [semesterFilter, setSemesterFilter] = useState<string>('');
+
+  // Syllabus tracking state
+  const [syllabusUnits, setSyllabusUnits] = useState<Array<{ number: number; title: string; topics: string[] }>>([]);
+  const [completedTopics, setCompletedTopics] = useState<string[]>([]);  const [classProgressMap, setClassProgressMap] = useState<Record<string, { completed: number; total: number }>>({});
+  const manageableClasses = useMemo(
+    () => classes.filter((item) => item.canManageStudents),
+    [classes]
+  );
+
+  const selectedClass = useMemo(
+    () => manageableClasses.find((item) => item._id === selectedClassId) ?? null,
+    [manageableClasses, selectedClassId]
+  );
+
+  const filteredStudents = useMemo(() => {
+    if (!semesterFilter) return candidateStudents;
+    return candidateStudents.filter(s => s.inSelectedClass || s.semester === Number(semesterFilter));
+  }, [candidateStudents, semesterFilter]);
+
+  const uniqueSemesters = useMemo(
+    () => [...new Set(candidateStudents.map(s => s.semester))].filter(Boolean).sort((a, b) => a - b),
+    [candidateStudents]
+  );
+
+  const fetchClassProgress = async (classId: string, semester: number) => {
+    try {
+      // Fetch semester syllabus
+      const syllabusRes = await fetch(`/api/syllabus?semester=${semester}`);
+      const syllabusData = await syllabusRes.json();
+      const totalTopics = syllabusData.subjects?.[0]?.units?.reduce((sum: number, unit: { topics?: Array<string> }) => sum + (unit.topics?.length || 0), 0) || 0;
+
+      // Fetch progress
+      const progressRes = await fetch(`/api/staff/classes/${classId}/syllabus`);
+      const progressData = await progressRes.json();
+      const completedCount = progressData.completedTopics?.length || 0;
+
+      return { completed: completedCount, total: totalTopics };
+    } catch {
+      return { completed: 0, total: 0 };
+    }
+  };
 
   const fetchClasses = useCallback(async () => {
     try {
@@ -60,9 +107,17 @@ export default function StaffPage() {
       if (!res.ok) { setFeedback(data.message || 'Failed to load classes.'); setFeedbackType('error'); return; }
       const staffClasses: StaffClass[] = Array.isArray(data.classes) ? data.classes : [];
       setClasses(staffClasses);
-      const first = staffClasses.find((c) => c.canManageStudents);
-      if (first) {
-        setSelectedClassId((prev) => prev || first._id);
+
+      // Fetch progress for all classes
+      const progressMap: Record<string, { completed: number; total: number }> = {};
+      for (const cls of staffClasses) {
+        const progress = await fetchClassProgress(cls._id, cls.semester);
+        progressMap[cls._id] = progress;
+      }
+      setClassProgressMap(progressMap);
+
+      if (!selectedClassId && staffClasses.length > 0) {
+        setSelectedClassId(staffClasses[0]._id);
       }
     } catch {
       setFeedback('Failed to load classes.'); setFeedbackType('error');
@@ -72,25 +127,104 @@ export default function StaffPage() {
   }, []);
 
   const fetchCandidates = async (classId: string) => {
-    const res  = await fetch(`/api/staff/classes/${classId}/students`);
-    const data = await res.json();
-    if (!res.ok) { setCandidateStudents([]); setFeedback(data.message || 'Failed to load students.'); setFeedbackType('error'); return; }
+    const response = await fetch(`/api/staff/classes/${classId}/students`);
+    const data = await response.json();
+
+    if (!response.ok) {
+      setCandidateStudents([]);
+      return;
+    }
+
     setCandidateStudents(Array.isArray(data.candidates) ? data.candidates : []);
   };
+const fetchSyllabusAndProgress = async (classId: string, semester: number) => {
+  try {
+    console.log('📚 Fetching syllabus for semester:', semester);
+    
+    // Fetch semester syllabus
+    const semesterResponse = await fetch(`/api/syllabus?semester=${semester}`);
+    const semesterData = await semesterResponse.json();
+    console.log('📚 Semester response:', semesterData);
+    
+    // API returns array of subjects directly
+    const units = semesterData?.[0]?.units || [];
+    console.log('📚 Units extracted:', units.length, 'units');
+    setSyllabusUnits(units);
 
-  useEffect(() => { void fetchClasses(); }, [fetchClasses]);
+    // Fetch progress for this class
+    const progressResponse = await fetch(`/api/staff/classes/${classId}/syllabus`);
+    const progressData = await progressResponse.json();
+    console.log('📚 Progress response:', progressData);
+    
+    if (progressData.ok) {
+      setCompletedTopics(progressData.completedTopics || []);
+    }
+  } catch {
+    console.error('Error fetching syllabus/progress');
+  }
+};
   useEffect(() => {
     if (!selectedClassId) { setCandidateStudents([]); setSelectedCandidateRoll(''); return; }
     void fetchCandidates(selectedClassId);
-  }, [selectedClassId]);
+    const semester = manageableClasses.find(c => c._id === selectedClassId)?.semester || 6;
+    void fetchSyllabusAndProgress(selectedClassId, semester);
+  }, [selectedClassId, manageableClasses]);
+
+  const handleCreateClass = async () => {
+    if (!createForm.name || !createForm.semester || !createForm.capacity) {
+      setFeedback('All fields are required.');
+      return;
+    }
+
+    try {
+      setIsCreating(true);
+      setFeedback(null);
+
+      const response = await fetch('/api/staff/classes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: createForm.name,
+          semester: Number(createForm.semester),
+          capacity: Number(createForm.capacity),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setFeedback(data.message || 'Failed to create class.');
+        return;
+      }
+
+      setFeedback('✓ Class created successfully!');
+      setCreateForm({ name: '', semester: '', capacity: '' });
+      
+      await fetchClasses();
+      setTimeout(() => setActiveTab('dashboard'), 1500);
+    } catch {
+      setFeedback('Error creating class.');
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
   const handleAddStudent = async () => {
-    if (!selectedClass)        { setFeedback('Select a class where you are class guide.'); setFeedbackType('error'); return; }
-    if (!newRollNumber.trim()) { setFeedback('Enter a student roll number.');              setFeedbackType('error'); return; }
+    if (!selectedClass) {
+      setFeedback('Select a class first.');
+      return;
+    }
+
+    if (!newRollNumber.trim()) {
+      setFeedback('Enter a student roll number.');
+      return;
+    }
+
     try {
       setIsSubmitting(true); setFeedback(null); setFeedbackType(null);
       const res  = await fetch(`/api/staff/classes/${selectedClass._id}/students`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rollNumber: newRollNumber.trim() }),
       });
@@ -100,188 +234,109 @@ export default function StaffPage() {
       setNewRollNumber(''); setSelectedCandidateRoll('');
       await fetchClasses(); await fetchCandidates(selectedClass._id);
     } catch {
-      setFeedback('Unable to add student.'); setFeedbackType('error');
+      setFeedback('Error adding student.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
+ const handleSaveProgress = async (completed: string[]) => {
+  if (!selectedClass) return;
+  
+  try {
+    setIsSaving(true);
+    console.log('Saving progress:', completed.length, 'topics');
+    
+    const response = await fetch(
+      `/api/staff/classes/${selectedClass._id}/syllabus`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completedTopics: completed }),
+      }
+    );
+    
+    const data = await response.json();
+    if (data.ok) {
+      setFeedback('✓ Progress saved!');
+      setCompletedTopics(data.completedTopics);
+    }
+  } catch {
+    setFeedback('Failed to save progress');
+  } finally {
+    setIsSaving(false);
+  }
+};
+
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', backgroundColor: '#F5F4F0', fontFamily: "'DM Sans', sans-serif", color: '#1A1916' }}>
-
-      {/* ── Google Fonts + shared styles ── */}
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,700;0,9..40,800&family=DM+Serif+Display:ital@0;1&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-
-        .staff-nav-link {
-          display: flex; align-items: center; gap: 12px;
-          padding: 0 16px; height: 44px; border-radius: 12px;
-          font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
-          cursor: pointer; border: none; width: 100%; text-align: left;
-          transition: background 0.18s, color 0.18s;
-          position: relative; font-family: 'DM Sans', sans-serif; background: none;
-        }
-        .staff-nav-link.inactive { color: #9E9B94; }
-        .staff-nav-link.inactive:hover { background: rgba(74,144,104,0.08); color: #4A9068; }
-        .staff-nav-link.active   { background: #E2F5EA; color: #4A9068; border: 1px solid #B8DEC9; }
-
-        .staff-card {
-          background: #FDFCF9; border: 1.5px solid #E8E6E0; border-radius: 20px;
-        }
-
-        .staff-tag {
-          display: inline-flex; align-items: center; gap: 6px;
-          padding: 4px 12px; border-radius: 100px;
-          font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
-        }
-
-        .staff-btn-primary {
-          display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-          background: #1A1916; color: #F5F4F0; border-radius: 10px;
-          font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 12px;
-          padding: 9px 18px; border: none; cursor: pointer;
-          transition: background 0.2s, transform 0.15s; white-space: nowrap;
-        }
-        .staff-btn-primary:hover:not(:disabled) { background: #2E2D29; transform: translateY(-1px); }
-        .staff-btn-primary:disabled { background: #C8C6BF; cursor: not-allowed; }
-
-        .staff-btn-ghost {
-          display: inline-flex; align-items: center; gap: 8px;
-          background: transparent; color: #6B6860; border-radius: 10px;
-          font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 12px;
-          padding: 8px 16px; border: 1.5px solid #E8E6E0;
-          transition: border-color 0.2s, color 0.2s, background 0.2s;
-          cursor: pointer; text-decoration: none; white-space: nowrap;
-        }
-        .staff-btn-ghost:hover { border-color: #C8C6BF; color: #1A1916; background: #FDFCF9; }
-
-        .staff-input {
-          font-family: 'DM Sans', sans-serif; font-size: 13px;
-          border: 1.5px solid #E8E6E0; background: #F5F4F0;
-          color: #1A1916; border-radius: 10px; height: 42px; width: 100%;
-          padding: 0 12px; transition: border-color 0.15s, box-shadow 0.15s;
-        }
-        .staff-input:focus { outline: none; border-color: #4A9068; box-shadow: 0 0 0 2.5px rgba(74,144,104,0.15); }
-
-        .dot-grid-staff {
-          background-image: radial-gradient(circle, #D0CEC8 1px, transparent 1px);
-          background-size: 28px 28px;
-        }
-
-        .staff-scroll::-webkit-scrollbar { width: 4px; }
-        .staff-scroll::-webkit-scrollbar-track { background: transparent; }
-        .staff-scroll::-webkit-scrollbar-thumb { background: #E8E6E0; border-radius: 99px; }
-        .staff-scroll::-webkit-scrollbar-thumb:hover { background: #C8C6BF; }
-
-        .mobile-overlay-staff {
-          position: fixed; inset: 0; background: rgba(26,25,22,0.4);
-          backdrop-filter: blur(4px); z-index: 40;
-        }
-
-        @media (min-width: 1024px) {
-          .staff-sidebar   { transform: translateX(0) !important; }
-          .mobile-overlay-staff { display: none !important; }
-          .staff-main      { margin-left: 240px !important; }
-          .lg-hidden       { display: none !important; }
-        }
-      `}</style>
-
-      {/* ── Mobile overlay ── */}
-      <AnimatePresence>
-        {isMobileMenuOpen && (
-          <motion.div className="mobile-overlay-staff"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            onClick={() => setIsMobileMenuOpen(false)}
-          />
+    <div className="min-h-screen bg-slate-100 flex">
+      {/* Sidebar */}
+      <motion.aside
+        initial={{ x: -300 }}
+        animate={{ x: 0 }}
+        className={cn(
+          'bg-slate-900 text-white transition-all duration-300 flex flex-col',
+          sidebarOpen ? 'w-64' : 'w-20'
         )}
-      </AnimatePresence>
-
-      {/* ── Sidebar ── */}
-      <aside
-        className="staff-sidebar"
-        style={{
-          position: 'fixed', top: 0, left: 0, bottom: 0, width: 240,
-          backgroundColor: '#FDFCF9', borderRight: '1.5px solid #E8E6E0',
-          display: 'flex', flexDirection: 'column', zIndex: 50,
-          transition: 'transform 0.3s ease',
-          transform: isMobileMenuOpen ? 'translateX(0)' : 'translateX(-100%)'
-        }}
       >
-        {/* Wordmark */}
-        <div style={{ height: 64, display: 'flex', alignItems: 'center', gap: 10, padding: '0 20px', borderBottom: '1.5px solid #E8E6E0' }}>
-          <div style={{ width: 32, height: 32, background: '#1A1916', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <span style={{ color: '#F5F4F0', fontSize: 13, fontWeight: 800, fontFamily: 'DM Serif Display, serif' }}>C</span>
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 400, color: '#1A1916', letterSpacing: '-0.02em', fontFamily: 'DM Serif Display, serif' }}>Cursus</div>
-            <div style={{ fontSize: 9, fontWeight: 700, color: '#9E9B94', letterSpacing: '0.14em', textTransform: 'uppercase' }}>Staff Portal</div>
-          </div>
-          <span className="staff-tag" style={{ backgroundColor: '#E2F5EA', color: '#4A9068', flexShrink: 0 }}>Staff</span>
+        {/* Logo */}
+        <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2 hover:opacity-80">
+            <ArrowLeft size={20} />
+            {sidebarOpen && <span className="font-bold text-sm">Back</span>}
+          </Link>
         </div>
 
-        {/* Nav */}
-        <nav className="staff-scroll" style={{ flex: 1, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 4, overflowY: 'auto' }}>
-          {/* Dot-grid texture */}
-          <div className="dot-grid-staff" style={{ height: 48, borderRadius: 12, marginBottom: 8, opacity: 0.35, maskImage: 'linear-gradient(to right, black 0%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to right, black 0%, transparent 100%)' }} />
+        {/* Navigation */}
+        <nav className="flex-1 p-4 space-y-2">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
 
-          {tabs.map((t) => {
-            const isActive = tab === t.id;
             return (
-              <button key={t.id} onClick={() => { setTab(t.id); setIsMobileMenuOpen(false); }}
-                className={`staff-nav-link ${isActive ? 'active' : 'inactive'}`}
-              >
-                <t.icon size={16} style={{ flexShrink: 0, color: isActive ? '#4A9068' : 'currentColor' }} />
-                {t.label}
-                {isActive && (
-                  <motion.span layoutId="staff-nav-indicator"
-                    style={{ marginLeft: 'auto', width: 6, height: 6, borderRadius: '50%', backgroundColor: '#4A9068', flexShrink: 0 }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                  />
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={cn(
+                  'w-full flex items-center px-4 h-12 rounded-xl transition-all duration-300 gap-4 group relative',
+                  isActive 
+                    ? 'bg-white/10 text-white shadow-inner border border-white/10' 
+                    : 'text-indigo-300 hover:bg-white/5 hover:text-white'
                 )}
+              >
+                <Icon size={20} className="shrink-0" />
+                {sidebarOpen && <span className="text-sm font-medium">{item.label}</span>}
               </button>
             );
           })}
         </nav>
 
-        {/* Back link */}
-        <div style={{ padding: 12, borderTop: '1.5px solid #E8E6E0' }}>
-          <Link href="/" className="staff-btn-ghost" style={{ width: '100%', justifyContent: 'center' }}>
-            <ArrowLeft size={13} /> Back to home
+        <div className="p-4 border-t border-white/5">
+          <Link href="/">
+            <Button variant="ghost" className="w-full justify-start text-indigo-300 hover:text-white gap-3 rounded-xl px-4 py-6">
+              <ArrowLeft size={16} />
+              <span className="text-xs font-bold uppercase tracking-widest">Exit</span>
+            </Button>
           </Link>
         </div>
-      </aside>
+      </motion.aside>
 
-      {/* ── Main ── */}
-      <main className="staff-main staff-scroll" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-
-        {/* Header */}
-        <header style={{
-          height: 64, flexShrink: 0,
-          backgroundColor: 'rgba(245,244,240,0.88)', backdropFilter: 'blur(12px)',
-          borderBottom: '1px solid #E8E6E0', padding: '0 28px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, zIndex: 10,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-            <button onClick={() => setIsMobileMenuOpen(true)} className="lg-hidden"
-              style={{ background: 'none', border: '1.5px solid #E8E6E0', borderRadius: 8, padding: 6, cursor: 'pointer', color: '#6B6860', flexShrink: 0, display: 'flex', alignItems: 'center' }}
-            >
-              <LayoutDashboard size={16} />
-            </button>
-            <div style={{ minWidth: 0 }}>
-              <h1 style={{ fontFamily: 'DM Serif Display, serif', fontSize: 20, fontWeight: 400, letterSpacing: '-0.02em', color: '#1A1916', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {tabs.find((t) => t.id === tab)?.label}
-              </h1>
-              <p style={{ fontSize: 11, color: '#9E9B94', fontWeight: 500, marginTop: 1 }}>Manage your assigned classes and students</p>
-            </div>
+      {/* Main Content */}
+      <main className="flex-1 overflow-y-auto">
+        <div className="p-6 md:p-8">
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-4xl font-bold text-slate-900">Staff Portal</h1>
+            <p className="text-slate-600 mt-2">Manage your classes and customize curriculum</p>
           </div>
 
-          {/* Bell icon */}
-          <button className="staff-btn-ghost" style={{ padding: '8px 10px', gap: 0, position: 'relative' }}>
-            <Bell size={15} />
-            <span style={{ position: 'absolute', top: 8, right: 8, width: 6, height: 6, borderRadius: '50%', backgroundColor: '#C06060', border: '1.5px solid #F5F4F0' }} />
-          </button>
-        </header>
+            <div className="flex items-center gap-4">
+              <Button size="icon" variant="ghost" className="rounded-xl w-10 h-10 border border-slate-100 bg-slate-50/50 relative">
+                <Bell size={18} className="text-slate-400" />
+                <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-rose-500 rounded-full border border-white" />
+              </Button>
+            </div>
+          </header>
 
         {/* Scrollable content */}
         <div className="staff-scroll" style={{ flex: 1, overflowY: 'auto', padding: '28px 28px 60px', backgroundColor: '#F5F4F0', position: 'relative' }}>

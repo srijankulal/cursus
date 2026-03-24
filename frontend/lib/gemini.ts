@@ -1,7 +1,7 @@
 /* ─── Gemini AI Integration ──────────────────────────────────── */
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY ;
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`;
 
 export interface StudyPlanItem {
   day: number;
