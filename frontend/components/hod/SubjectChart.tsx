@@ -33,7 +33,7 @@ export const SubjectChart = () => (
           tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b', transform: 'translate(0, 5)' }}
         />
         <YAxis hide />
-        <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc', radius: [12, 12, 0, 0] }} />
+        <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc', rx: 12, ry: 12 }} />
         <Bar 
           dataKey="completion" 
           radius={[10, 10, 10, 10]} 
