@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Home, BookOpen, Calendar, MessageSquare, PanelLeftClose, PanelLeftOpen, GraduationCap, Sparkles } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
-import Link from 'next/link';
 
 interface SidebarProps {
   activeTab: string;
@@ -72,9 +71,7 @@ export const Sidebar = ({
           ) : (
             <>
               <div className="w-10 h-10 bg-slate-950 rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-slate-900/10 transition-transform active:scale-95 cursor-pointer">
-              <Link href="/" className="flex items-center gap-1">
                 <span className="text-white text-sm font-black leading-none uppercase">C</span>
-              </Link>
               </div>
               <motion.span
                 initial={{ opacity: 0, x: -8 }}

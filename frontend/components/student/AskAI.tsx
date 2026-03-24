@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { syllabus } from '@/models/syllabus';
+import { syllabus } from '@/data/syllabus';
 import { askAIChat } from '@/lib/gemini';
 import { Send, Bot, User, Sparkles } from 'lucide-react';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';

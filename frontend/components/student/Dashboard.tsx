@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { storage } from '@/lib/storage';
-import { syllabus, EXAM_DATE_DEFAULT } from '@/models/syllabus';
+import { syllabus, EXAM_DATE_DEFAULT } from '@/data/syllabus';
 import { calculateRisk, RiskStatus } from '@/lib/riskCalculator';
 import { cn } from '@/lib/utils';
 import { CheckCircle2, Target, Clock, TrendingUp, Flame, BookMarked, Zap, CalendarDays } from 'lucide-react';

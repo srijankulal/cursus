@@ -7,7 +7,7 @@ import { Dashboard } from '@/components/student/Dashboard';
 import { Syllabus } from '@/components/student/Syllabus';
 import { StudyPlan } from '@/components/student/StudyPlan';
 import { AskAI } from '@/components/student/AskAI';
-import { syllabus } from '@/models/syllabus';
+import { syllabus } from '@/data/syllabus';
 import { storage } from '@/lib/storage';
 
 const TITLES: Record<string, { title: string; sub: string; hue: string }> = {
