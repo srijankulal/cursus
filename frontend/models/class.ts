@@ -16,6 +16,7 @@ export interface IClass extends Document {
   courseAssignments: ICourseAssignment[];
   students?: Types.ObjectId[];
   hod: Types.ObjectId;
+  
   createdAt: Date;
   updatedAt: Date;
 }
@@ -33,13 +34,13 @@ const ClassSchema = new mongoose.Schema<IClass>(
   {
     department: { type: String, required: true, trim: true },
     name: { type: String, required: true, trim: true },
-    semester: { type: Number, required: true, min: 1, max: 6 },
+    semester: { type: Number, required: true, min: 1, max: 8 },
     capacity: { type: Number, required: true, min: 1 },
     classGuide: { type: mongoose.Schema.Types.ObjectId, ref: "Faculty", required: true },
     faculties: { type: [mongoose.Schema.Types.ObjectId], ref: "Faculty", default: [] },
     courseAssignments: { type: [CourseAssignmentSchema], default: [] },
     students: { type: [mongoose.Schema.Types.ObjectId], ref: "Student", default: [] },
-    hod: { type: mongoose.Schema.Types.ObjectId, ref: "Hod", required: true },
+    hod: { type: mongoose.Schema.Types.ObjectId, ref: "Hod" },
   },
   { timestamps: true }
 );
