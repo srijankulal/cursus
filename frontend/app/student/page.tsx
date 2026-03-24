@@ -34,6 +34,8 @@ const TITLES: Record<string, { title: string; sub: string; hue: string }> = {
 
 export default function StudentPage() {
   const [tab, setTab] = useState('dashboard');
+  const [loading, setLoading] = useState(true);
+const [error, setError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [profile, setProfile] = useState<StudentProfile | null>(null);
@@ -45,26 +47,32 @@ export default function StudentPage() {
   const total = sem.subjects.flatMap(s => s.units.flatMap(u => u.topics)).length;
   const progress = Math.round((done / total) * 100);
 
-  useEffect(() => {
-    async function loadProfile() {
-      try {
-        const response = await fetch('/api/student/profile', { cache: 'no-store' });
-        const data = await response.json();
+useEffect(() => {
+  async function loadProfile() {
+    setLoading(true);
+    setError(null);
 
-        if (!response.ok) {
-          return;
-        }
+    try {
+      const response = await fetch('/api/student/profile', { cache: 'no-store' });
+      const data = await response.json();
 
-        if (data.profile) {
-          setProfile(data.profile as StudentProfile);
-        }
-      } catch {
-        // Keep dashboard usable with fallback content when profile request fails.
+      if (!response.ok) {
+        setError(data?.message ?? 'Failed to load profile');
+        return;
       }
-    }
 
-    void loadProfile();
-  }, []);
+      if (data.profile) {
+        setProfile(data.profile as StudentProfile);
+      }
+    } catch {
+      setError('Failed to load profile');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  void loadProfile();
+}, []);
 
   const page = TITLES[tab] ?? TITLES.dashboard;
 

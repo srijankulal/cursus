@@ -153,13 +153,13 @@ const rawData = [
         "unit_number": 2,
         "title": "Data Wrangling and Exploratory Data Analysis",
         "hours": 10,
-        "content": "Data Wrangling: Handling Missing Values (dropna, fillna), Removing Duplicates, Data Type Conversion, Renaming Columns, Filtering and Selecting Data. Data Transformation: Normalization, Standardization, Encoding Categorical Variables (Label Encoding, One-Hot Encoding). Exploratory Data Analysis (EDA): Descriptive Statistics (mean, median, mode, variance, standard deviation), Distribution Analysis, Correlation, Covariance. Data Visualization: Matplotlib and Seaborn — Bar charts, Histograms, Box plots, Scatter plots, Heatmaps, Pair plots."
+        "content": "Data Wrangling: Handling Missing Values (dropna, fillna), Removing Duplicates, Data Type Conversion, Renaming Columns, Filtering and Selecting Data. Data Transformation: Normalization, Standardization, Encoding Categorical Variables (Label Encoding, One-Hot Encoding). Exploratory Data Analysis (EDA): Descriptive Statistics (mean, median, mode, variance, standard deviation), Distribution Analysis, Correlation, Covariance. Data Visualization: Matplotlib and Seaborn Bar charts, Histograms, Box plots, Scatter plots, Heatmaps, Pair plots."
       },
       {
         "unit_number": 3,
         "title": "Introduction to Machine Learning",
         "hours": 12,
-        "content": "Machine Learning Overview: Types of Machine Learning — Supervised, Unsupervised, Reinforcement Learning. Supervised Learning Algorithms: Linear Regression (Simple and Multiple), Logistic Regression, Decision Trees, K-Nearest Neighbors (KNN). Model Evaluation: Train-Test Split, Cross Validation, Confusion Matrix, Accuracy, Precision, Recall, F1-Score, Mean Squared Error (MSE), R-Squared. Unsupervised Learning: K-Means Clustering, Hierarchical Clustering, Cluster Evaluation. Introduction to scikit-learn: Loading datasets, Preprocessing, Fitting models, Prediction."
+        "content": "Machine Learning Overview: Types of Machine Learning > Supervised, Unsupervised, Reinforcement Learning. Supervised Learning Algorithms: Linear Regression (Simple and Multiple), Logistic Regression, Decision Trees, K-Nearest Neighbors (KNN). Model Evaluation: Train-Test Split, Cross Validation, Confusion Matrix, Accuracy, Precision, Recall, F1-Score, Mean Squared Error (MSE), R-Squared. Unsupervised Learning: K-Means Clustering, Hierarchical Clustering, Cluster Evaluation. Introduction to scikit-learn: Loading datasets, Preprocessing, Fitting models, Prediction."
       },
       {
         "unit_number": 4,
