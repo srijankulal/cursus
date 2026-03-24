@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { storage } from '@/lib/storage';
-import { syllabus, EXAM_DATE_DEFAULT } from '@/data/syllabus';
+import { useSyllabus, EXAM_DATE_DEFAULT } from '@/lib/hooks/use-syllabus';
 import { calculateRisk, RiskStatus } from '@/lib/riskCalculator';
 import { cn } from '@/lib/utils';
 import { CheckCircle2, Target, Clock, TrendingUp, Flame, BookMarked, Zap, CalendarDays } from 'lucide-react';
@@ -54,22 +54,26 @@ function StatCard({ icon: Icon, label, value, color, delay }: { icon: any, label
 export const Dashboard = () => {
   const [status, setStatus] = useState<RiskStatus | null>(null);
   const [recentTopics, setRecentTopics] = useState<string[]>([]);
-
-  const sem = syllabus[0];
-  const allTopics = sem.subjects.flatMap(s => s.units.flatMap(u => u.topics));
-  const allHY = allTopics.filter(t => t.isHighYield);
+  const { semester: sem, loading, error } = useSyllabus(6);
 
   useEffect(() => {
+    if (!sem) return;
+    const allTopics = sem.subjects.flatMap(s => s.units.flatMap(u => u.topics));
     const ids = storage.getCompletedTopics();
     const examDate = storage.getExamDate() || EXAM_DATE_DEFAULT;
+    
     setStatus(calculateRisk(allTopics.length, ids.length, examDate));
     setRecentTopics(
       [...ids].reverse().slice(0, 5).map(id => allTopics.find(t => t.id === id)?.name ?? id)
     );
-  }, []);
+  }, [sem]);
 
+  if (loading) return <div className="p-10 text-center animate-pulse text-app-muted uppercase tracking-[0.2em] font-bold">Initializing Dashboard...</div>;
+  if (error || !sem) return <div className="p-10 text-center text-rose-500 font-bold uppercase tracking-[0.2em]">Error loading dashboard</div>;
   if (!status) return null;
 
+  const allTopics = sem.subjects.flatMap(s => s.units.flatMap(u => u.topics));
+  const allHY = allTopics.filter(t => t.isHighYield);
   const risk = riskMap[status.riskLevel];
   const completedIds = storage.getCompletedTopics();
   const hyLeft = allHY.length - completedIds.filter(id => allHY.some(t => t.id === id)).length;

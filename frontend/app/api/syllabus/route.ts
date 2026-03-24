@@ -1,63 +1,7 @@
-export interface Topic {
-  id: string;
-  name: string;
-  isHighYield: boolean;
-  unitId: string;
-}
+import { NextRequest, NextResponse } from 'next/server';
+import clientPromise from '@/lib/mongodb';
 
-export interface Unit {
-  id: string;
-  unit_number: number;
-  title: string;
-  hours: number;
-  content: string; // The raw content string from the JSON
-  topics: Topic[]; // Derived from parsing content by ". "
-  subjectId: string;
-}
-
-export interface Subject {
-  id: string; // subject_code
-  subject_code: string;
-  subject_name: string;
-  type: string;
-  credits: number;
-  total_hours: number;
-  exam_marks: number;
-  cie_marks: number;
-  total_marks: number;
-  units: Unit[];
-  semesterNumber: number;
-}
-
-export interface Semester {
-  id: string; // "sem" + semesterNumber
-  semesterNumber: number;
-  name: string;
-  subjects: Subject[];
-}
-
-const today = new Date();
-export const EXAM_DATE_DEFAULT = new Date(today);
-EXAM_DATE_DEFAULT.setDate(today.getDate() + 30);
-
-/**
- * Helper to parse the content string into individual topics
- */
-function parseTopics(content: string, unitId: string): Topic[] {
-  // Split by "." and filter out empty strings
-  return content.split(".").map(s => s.trim()).filter(Boolean).map((topicName, index) => ({
-    id: `${unitId}-t${index + 1}`,
-    name: topicName,
-    isHighYield: topicName.toLowerCase().includes("architecture") || 
-                 topicName.toLowerCase().includes("jdbc") ||
-                 topicName.toLowerCase().includes("servlet") ||
-                 topicName.toLowerCase().includes("machine learning") ||
-                 topicName.toLowerCase().includes("mysql"),
-    unitId
-  }));
-}
-
-const rawData = [
+const FALLBACK_SYLLABUS = [
   {
     "semester": 6,
     "subject_code": "G601DC2.6",
@@ -153,13 +97,13 @@ const rawData = [
         "unit_number": 2,
         "title": "Data Wrangling and Exploratory Data Analysis",
         "hours": 10,
-        "content": "Data Wrangling: Handling Missing Values (dropna, fillna), Removing Duplicates, Data Type Conversion, Renaming Columns, Filtering and Selecting Data. Data Transformation: Normalization, Standardization, Encoding Categorical Variables (Label Encoding, One-Hot Encoding). Exploratory Data Analysis (EDA): Descriptive Statistics (mean, median, mode, variance, standard deviation), Distribution Analysis, Correlation, Covariance. Data Visualization: Matplotlib and Seaborn — Bar charts, Histograms, Box plots, Scatter plots, Heatmaps, Pair plots."
+        "content": "Data Wrangling: Handling Missing Values (dropna, fillna), Removing Duplicates, Data Type Conversion, Renaming Columns, Filtering and Selecting Data. Data Transformation: Normalization, Standardization, Encoding Categorical Variables (Label Encoding, One-Hot Encoding). Exploratory Data Analysis (EDA): Descriptive Statistics (mean, median, mode, variance, standard deviation), Distribution Analysis, Correlation, Covariance. Data Visualization: Matplotlib and Seaborn â€” Bar charts, Histograms, Box plots, Scatter plots, Heatmaps, Pair plots."
       },
       {
         "unit_number": 3,
         "title": "Introduction to Machine Learning",
         "hours": 12,
-        "content": "Machine Learning Overview: Types of Machine Learning — Supervised, Unsupervised, Reinforcement Learning. Supervised Learning Algorithms: Linear Regression (Simple and Multiple), Logistic Regression, Decision Trees, K-Nearest Neighbors (KNN). Model Evaluation: Train-Test Split, Cross Validation, Confusion Matrix, Accuracy, Precision, Recall, F1-Score, Mean Squared Error (MSE), R-Squared. Unsupervised Learning: K-Means Clustering, Hierarchical Clustering, Cluster Evaluation. Introduction to scikit-learn: Loading datasets, Preprocessing, Fitting models, Prediction."
+        "content": "Machine Learning Overview: Types of Machine Learning â€” Supervised, Unsupervised, Reinforcement Learning. Supervised Learning Algorithms: Linear Regression (Simple and Multiple), Logistic Regression, Decision Trees, K-Nearest Neighbors (KNN). Model Evaluation: Train-Test Split, Cross Validation, Confusion Matrix, Accuracy, Precision, Recall, F1-Score, Mean Squared Error (MSE), R-Squared. Unsupervised Learning: K-Means Clustering, Hierarchical Clustering, Cluster Evaluation. Introduction to scikit-learn: Loading datasets, Preprocessing, Fitting models, Prediction."
       },
       {
         "unit_number": 4,
@@ -171,45 +115,47 @@ const rawData = [
   }
 ];
 
-const semesterMap = new Map();
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const semester = searchParams.get('semester');
 
-rawData.forEach(item => {
-  const semNum = item.semester;
-  if (!semesterMap.has(semNum)) {
-    semesterMap.set(semNum, {
-      id: "sem" + semNum,
-      semesterNumber: semNum,
-      name: "Semester " + semNum,
-      subjects: []
-    });
+    const client = await clientPromise;
+    const db = client.db(process.env.MONGODB_DB_NAME || 'cursus');
+
+    // Fetch ALL records from syllabus, don't filter by semester yet
+    const syllabus = await db.collection('syllabus').find({}).toArray();
+
+    if (syllabus.length === 0) {
+      return NextResponse.json([]);
+    }
+
+    return NextResponse.json(syllabus);
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 });
   }
+}
 
-  const semester = semesterMap.get(semNum);
-  const subject = {
-    id: item.subject_code,
-    subject_code: item.subject_code,
-    subject_name: item.subject_name,
-    type: item.type,
-    credits: item.credits,
-    total_hours: item.total_hours,
-    exam_marks: item.exam_marks,
-    cie_marks: item.cie_marks,
-    total_marks: item.total_marks,
-    semesterNumber: semNum,
-    units: item.units.map(u => {
-      const unitId = item.subject_code + "-u" + u.unit_number;
-      return {
-        id: unitId,
-        unit_number: u.unit_number,
-        title: u.title,
-        hours: u.hours,
-        content: u.content,
-        subjectId: item.subject_code,
-        topics: parseTopics(u.content, unitId)
-      };
-    })
-  };
-  semester.subjects.push(subject);
-});
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { _id, subject_name, units, ...rest } = body;
 
-export const syllabus = Array.from(semesterMap.values());
+    const client = await clientPromise;
+    const db = client.db(process.env.MONGODB_DB_NAME || 'cursus');
+    
+    console.log('Using database:', db.databaseName);
+    console.log('Subject Name:', subject_name);
+
+    const result = await db.collection('syllabus').updateOne(
+      { subject_name },
+      { $set: { units, ...rest } },
+      { upsert: true }
+    );
+
+    return NextResponse.json({ success: true, result });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

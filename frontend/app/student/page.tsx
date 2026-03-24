@@ -7,7 +7,7 @@ import { Dashboard } from '@/components/student/Dashboard';
 import { Syllabus } from '@/components/student/Syllabus';
 import { StudyPlan } from '@/components/student/StudyPlan';
 import { AskAI } from '@/components/student/AskAI';
-import { syllabus } from '@/data/syllabus';
+import { useSyllabus } from '@/lib/hooks/use-syllabus';
 import { storage } from '@/lib/storage';
 
 const TITLES: Record<string, { title: string; sub: string; hue: string }> = {
@@ -22,17 +22,21 @@ export default function StudentPage() {
   const [progress, setProgress] = useState(0);
   const [collapsed, setCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const sem = syllabus[0];
+  const { semester: sem, loading, error } = useSyllabus(6);
 
   useEffect(() => {
+    if (!sem) return;
     const done = storage.getCompletedTopics().length;
-    const total = sem.subjects.flatMap(s => s.units.flatMap(u => u.topics)).length;
-    setProgress(Math.round((done / total) * 100));
-  }, [tab]);
+    const total = sem.subjects.flatMap(s => s.units.flatMap(u => u.topics || [])).length;
+    setProgress(total > 0 ? Math.round((done / total) * 100) : 0);
+  }, [tab, sem]);
 
   const page = TITLES[tab] ?? TITLES.dashboard;
 
   const renderContent = () => {
+    if (loading) return <div className="p-10 text-center animate-pulse text-app-muted uppercase tracking-[0.2em] font-bold">Loading Workspace...</div>;
+    if (error || !sem) return <div className="p-10 text-center text-rose-500 font-bold uppercase tracking-[0.2em]">Error loading workspace</div>;
+
     switch (tab) {
       case 'dashboard':   return <Dashboard />;
       case 'syllabus':    return <Syllabus activeSemesterId={sem.id} />;
@@ -50,7 +54,7 @@ export default function StudentPage() {
           setTab(t);
           setIsMobileMenuOpen(false);
         }}
-        semesterName={sem.name}
+        semesterName={sem?.name || "Loading..."}
         progress={progress}
         collapsed={collapsed}
         setCollapsed={setCollapsed}
